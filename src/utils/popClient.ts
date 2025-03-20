@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import * as POP3Client from "poplib";
+import POP3Client from "poplib";
 import { promisify } from "util";
 
 const readdir = promisify(fs.readdir);
@@ -14,9 +14,9 @@ export class PopClient {
   constructor(user: string, pass: string) {
     this.user = user;
     this.pass = pass;
-    this.client = new POP3Client("pop.gmail.com", 995, {
-      tlserrs: false,
+    this.client = new POP3Client(995, "pop.gmail.com", {
       enabletls: true,
+      ignoretlserrs: false,
       debug: false,
     });
   }
