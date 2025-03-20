@@ -107,14 +107,26 @@ export function setRoutes(app: Express) {
   // Endpoint to send current month's files via email
   app.post("/api/attachments/dte/email", (async (req, res) => {
     try {
-      const { email, subject, message } = req.body;
+      const { subject, message } = req.body;
 
-      if (!email) {
+      // Parse recipients from environment variable
+      const recipients = process.env.RECIPIENT_EMAIL
+        ? process.env.RECIPIENT_EMAIL.split(",").map((email) => email.trim())
+        : [];
+
+      if (recipients.length === 0) {
         return res.status(400).json({
           success: false,
-          error: "Email address is required",
+          error: "No recipients found in RECIPIENT_EMAIL environment variable",
         });
       }
+
+      // Log recipients for debugging
+      console.log(
+        `Sending email to ${recipients.length} recipients: ${recipients.join(
+          ", "
+        )}`
+      );
 
       // Use previous month's path instead of current month
       const previousMonthPath = getPreviousMonthPath();
@@ -227,9 +239,9 @@ export function setRoutes(app: Express) {
       // Files to send (PDF files and CSV)
       const filesToSend = [...pdfFiles, csvFilePath];
 
-      // Send email
+      // Send email using recipients from environment variable
       const result = await sendFilesViaEmail(
-        email,
+        recipients,
         filesToSend,
         subject || `${getPreviousYearAndMonth()}: CCF de Víctor M. Reyes`,
         message ||
@@ -249,7 +261,9 @@ export function setRoutes(app: Express) {
 
         res.status(200).json({
           success: true,
-          message: `Sent ${filesToSend.length} files from the previous month via email to ${email}`,
+          message: `Sent ${
+            filesToSend.length
+          } files via email to ${recipients.join(", ")}`,
           sentFiles: filesToSend.map((f) => path.basename(f)),
           deletedJsonFiles: jsonFiles.map((f) => path.basename(f)),
           result,
