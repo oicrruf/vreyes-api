@@ -55,15 +55,16 @@ export const isJsonAttachment = (attachment: any): boolean => {
 
 export const parseJsonAttachment = (attachment: any): any => {
   try {
-    if (!isJsonAttachment(attachment)) {
-      return null;
-    }
-
-    const jsonContent = attachment.content.toString("utf-8");
+    const jsonContent = attachment.content.toString("utf-8").trim(); // Trim whitespace
     return JSON.parse(jsonContent);
   } catch (error) {
-    console.error("Error parsing JSON attachment:", error);
-    return null;
+    const err = error as Error; // Explicitly cast error to Error
+    console.error("Error parsing JSON attachment:", err.message);
+    console.error(
+      "Invalid JSON content:",
+      attachment.content.toString("utf-8")
+    ); // Log problematic content
+    return null; // Return null for invalid JSON
   }
 };
 
