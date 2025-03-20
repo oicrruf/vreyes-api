@@ -10,6 +10,7 @@ import {
   saveAttachment,
   isJsonAttachment,
   parseJsonAttachment,
+  getPreviousMonthPath,
 } from "../utils/fileUtils";
 import path from "path";
 import fs from "fs";
@@ -17,9 +18,10 @@ import { Parser } from "json2csv";
 
 export function setRoutes(app: Express) {
   // Endpoint to get emails from the current month
-  app.get("/api/emails/current-month", (async (req, res) => {
+  app.post("/api/emails/current-month", (async (req, res) => {
     try {
       const result: EmailResponse = await listCurrentMonthEmails();
+
       if (result.success && result.data) {
         // Filter emails with "Documento Tributario" in the subject (case-insensitive)
         const filteredEmails = result.data.filter(
@@ -30,24 +32,57 @@ export function setRoutes(app: Express) {
               .includes("documento tributario".toLowerCase())
         );
 
-        // Process attachments for filtered emails
+        console.log(
+          `Found ${filteredEmails.length} emails with "Documento Tributario" in subject`
+        );
+
+        // Process and save attachments for filtered emails
+        let downloadedFiles = {
+          json: [] as string[],
+          pdf: [] as string[],
+        };
+
         filteredEmails.forEach((email) => {
           if (email.attachments && email.attachments.length > 0) {
-            let shouldDownloadPdf = false;
+            let shouldDownloadAttachments = false;
+            let jsonAttachment = null;
 
+            // First, check if any JSON attachment meets the criteria
             email.attachments.forEach((attachment) => {
               if (isJsonAttachment(attachment)) {
+                console.log(`Found JSON attachment in email: ${email.subject}`);
                 const jsonData = parseJsonAttachment(attachment);
                 if (jsonData?.receptor?.nrc === "2594881") {
-                  shouldDownloadPdf = true;
+                  console.log(
+                    `JSON matches criteria: receptor.nrc = ${jsonData.receptor.nrc}`
+                  );
+                  shouldDownloadAttachments = true;
+                  jsonAttachment = attachment;
                 }
               }
             });
 
-            if (shouldDownloadPdf) {
+            // If criteria is met, download both JSON and PDF attachments
+            if (shouldDownloadAttachments && jsonAttachment) {
+              // Save the JSON attachment directly to the month directory
+              console.log(
+                `Saving JSON attachment from email: ${email.subject}`
+              );
+              const savedJsonPath = saveAttachment(jsonAttachment);
+              if (savedJsonPath) {
+                console.log(`JSON attachment saved to: ${savedJsonPath}`);
+                downloadedFiles.json.push(savedJsonPath);
+              }
+
+              // Save any PDF attachments from the same email
               email.attachments.forEach((attachment) => {
                 if (attachment.filename?.toLowerCase().endsWith(".pdf")) {
-                  saveAttachment(attachment); // Save the PDF attachment
+                  console.log(`Saving PDF attachment: ${attachment.filename}`);
+                  const savedPath = saveAttachment(attachment);
+                  if (savedPath) {
+                    console.log(`PDF attachment saved to: ${savedPath}`);
+                    downloadedFiles.pdf.push(savedPath);
+                  }
                 }
               });
             }
@@ -56,9 +91,9 @@ export function setRoutes(app: Express) {
 
         res.status(200).json({
           success: true,
-          // data: filteredEmails,
           totalFiltered: filteredEmails.length,
           totalOriginal: result.data.length,
+          downloadedFiles: downloadedFiles,
         });
       } else {
         res.status(500).json(result);
@@ -72,7 +107,7 @@ export function setRoutes(app: Express) {
   // Endpoint to send current month's files via email
   app.post("/api/attachments/dte/email", (async (req, res) => {
     try {
-      const { email, fileNames, subject, message } = req.body;
+      const { email, subject, message } = req.body;
 
       if (!email) {
         return res.status(400).json({
@@ -81,149 +116,118 @@ export function setRoutes(app: Express) {
         });
       }
 
-      const currentPath = getCurrentMonthPath();
-      let filesToSend: string[] = [];
-
-      if (!fs.existsSync(currentPath)) {
-        fs.mkdirSync(currentPath, { recursive: true });
+      // Use previous month's path instead of current month
+      const previousMonthPath = getPreviousMonthPath();
+      if (!fs.existsSync(previousMonthPath)) {
+        fs.mkdirSync(previousMonthPath, { recursive: true });
         return res.status(404).json({
           success: false,
-          error: "No files found for the current month",
-          path: currentPath,
+          error: "No files found for the previous month",
+          path: previousMonthPath,
         });
       }
 
-      if (fileNames && Array.isArray(fileNames) && fileNames.length > 0) {
-        filesToSend = fileNames
-          .map((filename) => path.join(currentPath, filename))
-          .filter((filePath) => fs.existsSync(filePath));
-      } else {
-        const files = fs
-          .readdirSync(currentPath)
-          .filter((file) => file.toLowerCase().endsWith(".pdf"));
-        filesToSend = files.map((filename) => path.join(currentPath, filename));
-      }
+      // Get all PDF files from previous month
+      const pdfFiles = fs
+        .readdirSync(previousMonthPath)
+        .filter((file) => file.toLowerCase().endsWith(".pdf"))
+        .map((filename) => path.join(previousMonthPath, filename));
 
-      if (filesToSend.length === 0) {
+      // Get all JSON files from previous month
+      const jsonFiles = fs
+        .readdirSync(previousMonthPath)
+        .filter((file) => file.toLowerCase().endsWith(".json"))
+        .map((filename) => path.join(previousMonthPath, filename));
+
+      if (pdfFiles.length === 0) {
         return res.status(404).json({
           success: false,
-          error: "No files found to send",
-          path: currentPath,
+          error: "No PDF files found to send for the previous month",
+          path: previousMonthPath,
         });
       }
 
-      // Extract values from JSON attachments and generate CSV
-      const jsonValues: Array<{
-        Column1: string;
-        Column2: number;
-        Column3: number;
-        Column4: string;
-        Column5: string;
-        Column6: string;
-        Column7: string;
-        Column8: number;
-        Column9: number;
-        Column10: string;
-        Column11: number;
-        Column12: number;
-        Column13: number;
-        Column14: string;
-        Column15: string;
-        Column16: string;
-        Column17: number;
-        Column18: number;
-        Column19: number;
-        Column20: number;
-        Column21: number;
-      }> = [];
-      const emails = await listCurrentMonthEmails();
-      if (emails.success && emails.data) {
-        emails.data.forEach((email) => {
-          if (email.attachments && email.attachments.length > 0) {
-            let shouldProcessJson = false;
+      console.log(
+        `Found ${jsonFiles.length} JSON files and ${pdfFiles.length} PDF files for the previous month`
+      );
 
-            // Check JSON attachments for the filtering criteria
-            email.attachments.forEach((attachment) => {
-              if (isJsonAttachment(attachment)) {
-                const jsonData = parseJsonAttachment(attachment);
-                if (jsonData?.receptor?.nrc === "2594881") {
-                  shouldProcessJson = true;
-                  jsonValues.push({
-                    Column1: formatDate(jsonData.identificacion?.fecEmi) || "",
-                    Column2: 1,
-                    Column3: 3,
-                    Column4:
-                      jsonData.identificacion?.codigoGeneracion?.replace(
-                        /-/g,
-                        ""
-                      ) || "",
-                    Column5: jsonData.emisor?.nrc || "",
-                    Column6: jsonData.emisor?.nombre || "",
-                    Column7: jsonData.resumen?.totalExenta || "",
-                    Column8: 0,
-                    Column9: 0,
-                    Column10: jsonData.resumen?.totalGravada || "",
-                    Column11: 0,
-                    Column12: 0,
-                    Column13: 0,
-                    Column14: jsonData.resumen?.tributos?.valor || "",
-                    Column15: jsonData.resumen?.totalPagar || "",
-                    Column16: "",
-                    Column17: 1,
-                    Column18: 2,
-                    Column19: 4,
-                    Column20: 2,
-                    Column21: 3,
-                  });
-                }
-              }
+      // Process JSON files to generate CSV
+      const jsonValues = [];
+
+      for (const jsonFile of jsonFiles) {
+        try {
+          const jsonContent = fs.readFileSync(jsonFile, "utf8");
+          const jsonData = JSON.parse(jsonContent);
+
+          // Check if receptor.nrc matches criteria
+          if (jsonData?.receptor?.nrc === "2594881") {
+            jsonValues.push({
+              Column1: formatDate(jsonData.identificacion?.fecEmi) || "",
+              Column2: 1,
+              Column3: 3,
+              Column4:
+                jsonData.identificacion?.codigoGeneracion?.replace(/-/g, "") ||
+                "",
+              Column5: jsonData.emisor?.nrc || "",
+              Column6: jsonData.emisor?.nombre || "",
+              Column7: jsonData.resumen?.totalExenta || "",
+              Column8: 0,
+              Column9: 0,
+              Column10: jsonData.resumen?.totalGravada || "",
+              Column11: 0,
+              Column12: 0,
+              Column13: 0,
+              Column14: jsonData.resumen?.tributos?.valor || "",
+              Column15: jsonData.resumen?.totalPagar || "",
+              Column16: "",
+              Column17: 1,
+              Column18: 2,
+              Column19: 4,
+              Column20: 2,
+              Column21: 3,
             });
-
-            // Save PDFs only if the JSON matches the criteria
-            if (shouldProcessJson) {
-              email.attachments.forEach((attachment) => {
-                if (attachment.filename?.toLowerCase().endsWith(".pdf")) {
-                  saveAttachment(attachment); // Save the PDF attachment
-                }
-              });
-            }
           }
-        });
+        } catch (error) {
+          console.error(`Error processing JSON file ${jsonFile}:`, error);
+        }
       }
 
+      // Generate the CSV file
       const csvParser = new Parser({
         fields: [
-          "Column1", // identificacion_fecEmi
-          "Column2", // 1
-          "Column3", // 3
-          "Column4", // identificacion_codigoGeneracion
-          "Column5", // emisor_nrc
-          "Column6", // emisor_nombre
-          "Column7", // resumen_totalExenta
-          "Column8", // 0
-          "Column9", // 0
-          "Column10", // resumen_totalGravada
-          "Column11", // 0
-          "Column12", // 0
-          "Column13", // 0
-          "Column14", // resumen_tributos_valor
-          "Column15", // resumen_totalPagar
-          "Column16", // ''
-          "Column17", // 1
-          "Column18", // 2
-          "Column19", // 4
-          "Column20", // 2
-          "Column21", // 3
+          "Column1",
+          "Column2",
+          "Column3",
+          "Column4",
+          "Column5",
+          "Column6",
+          "Column7",
+          "Column8",
+          "Column9",
+          "Column10",
+          "Column11",
+          "Column12",
+          "Column13",
+          "Column14",
+          "Column15",
+          "Column16",
+          "Column17",
+          "Column18",
+          "Column19",
+          "Column20",
+          "Column21",
         ],
       });
+
       const csv = csvParser.parse(jsonValues);
-
-      // Generate the CSV filename
       const csvFileName = `COMPRAS-${getPreviousMonthName().toUpperCase()}-${new Date().getFullYear()}.csv`;
-      const csvFilePath = path.join(currentPath, csvFileName);
+      const csvFilePath = path.join(previousMonthPath, csvFileName);
       fs.writeFileSync(csvFilePath, csv);
-      filesToSend.push(csvFilePath);
 
+      // Files to send (PDF files and CSV)
+      const filesToSend = [...pdfFiles, csvFilePath];
+
+      // Send email
       const result = await sendFilesViaEmail(
         email,
         filesToSend,
@@ -233,10 +237,21 @@ export function setRoutes(app: Express) {
       );
 
       if (result.success) {
+        // Delete JSON files after successful email
+        for (const jsonFile of jsonFiles) {
+          try {
+            fs.unlinkSync(jsonFile);
+            console.log(`Deleted JSON file: ${jsonFile}`);
+          } catch (error) {
+            console.error(`Error deleting JSON file ${jsonFile}:`, error);
+          }
+        }
+
         res.status(200).json({
           success: true,
-          message: `Sent ${filesToSend.length} files via email to ${email}`,
+          message: `Sent ${filesToSend.length} files from the previous month via email to ${email}`,
           sentFiles: filesToSend.map((f) => path.basename(f)),
+          deletedJsonFiles: jsonFiles.map((f) => path.basename(f)),
           result,
         });
       } else {

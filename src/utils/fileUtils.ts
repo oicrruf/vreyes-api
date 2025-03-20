@@ -114,6 +114,15 @@ export const getCurrentMonthPath = (): string => {
   return path.join(basePath, year, month);
 };
 
+export const getPreviousMonthPath = (): string => {
+  const now = new Date();
+  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+  const year = previousMonth.getFullYear().toString();
+  const month = (previousMonth.getMonth() + 1).toString().padStart(2, "0");
+  const basePath = process.env.ATTACHMENTS_PATH || "./downloads";
+  return path.join(basePath, year, month);
+};
+
 export const listFilesInDirectory = (dirPath: string): Promise<string[]> => {
   return new Promise((resolve, reject) => {
     if (!fs.existsSync(dirPath)) {
