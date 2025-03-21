@@ -4,6 +4,7 @@ import { getPreviousMonthPath } from "../utils/fileUtils";
 import path from "path";
 import fs from "fs";
 import { Parser } from "json2csv";
+import { logToFile } from "../utils/logUtils";
 
 export function setEmailAttachmentsRoutes(app: Express) {
   // Endpoint to send current month's files via email
@@ -24,7 +25,7 @@ export function setEmailAttachmentsRoutes(app: Express) {
       }
 
       // Log recipients for debugging
-      console.log(
+      logToFile(
         `Sending email to ${recipients.length} recipients: ${recipients.join(
           ", "
         )}`
@@ -61,12 +62,14 @@ export function setEmailAttachmentsRoutes(app: Express) {
         });
       }
 
-      console.log(
+      logToFile(
         `Found ${jsonFiles.length} JSON files and ${pdfFiles.length} PDF files for the previous month`
       );
 
       // Process JSON files to generate CSV
       const jsonValues = [];
+      // Get NRC from environment variable with fallback to default
+      const targetNrc = process.env.RECEPTOR_NRC || "2594881";
 
       for (const jsonFile of jsonFiles) {
         try {
@@ -74,7 +77,7 @@ export function setEmailAttachmentsRoutes(app: Express) {
           const jsonData = JSON.parse(jsonContent);
 
           // Check if receptor.nrc matches criteria
-          if (jsonData?.receptor?.nrc === "2594881") {
+          if (jsonData?.receptor?.nrc === targetNrc) {
             jsonValues.push({
               Column1: formatDate(jsonData.identificacion?.fecEmi) || "",
               Column2: 1,
@@ -155,9 +158,12 @@ export function setEmailAttachmentsRoutes(app: Express) {
         for (const jsonFile of jsonFiles) {
           try {
             fs.unlinkSync(jsonFile);
-            console.log(`Deleted JSON file: ${jsonFile}`);
+            logToFile(`Deleted JSON file: ${jsonFile}`);
           } catch (error) {
-            console.error(`Error deleting JSON file ${jsonFile}:`, error);
+            logToFile(
+              `Error deleting JSON file ${jsonFile}: ${error}`,
+              "error"
+            );
           }
         }
 
@@ -177,7 +183,7 @@ export function setEmailAttachmentsRoutes(app: Express) {
         });
       }
     } catch (error) {
-      console.error("Error in /api/attachments/dte/email:", error);
+      logToFile(`Error in /api/attachments/dte/email: ${error}`, "error");
       res.status(500).json({
         success: false,
         error: "Failed to send files via email",
