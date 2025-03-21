@@ -1,7 +1,7 @@
 import express, { Express } from "express";
 import dotenv from "dotenv";
-import { setRoutes } from "./routes/emailRoutes";
-import { initializeCronJobs } from "./utils/cronJobs";
+import { setDteRoutes } from "./modules/dte/routes";
+import { initializeCronJobs } from "./scheduled/dte";
 
 dotenv.config();
 
@@ -12,7 +12,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Set up routes
-setRoutes(app);
+setDteRoutes(app);
 
 // Initialize cron jobs
 initializeCronJobs();
