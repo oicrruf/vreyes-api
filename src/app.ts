@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import { setDteRoutes } from "./modules/dte/routes";
 import { initializeCronJobs } from "./scheduled/dte";
 
+import { initializeClienteModule } from "./modules/cliente";
+
 dotenv.config();
 
 const app: Express = express();
@@ -13,6 +15,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Set up routes
 setDteRoutes(app);
+
+// Initialize modules
+initializeClienteModule(app);
 
 // Initialize cron jobs
 initializeCronJobs();
