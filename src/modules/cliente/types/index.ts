@@ -1,39 +1,34 @@
+import { ObjectId } from "mongodb";
+
 export interface Direccion {
   departamento: string;
   municipio: string;
+  distrito: string;
   complemento: string;
 }
 
 export interface Cliente {
-  id: number;
+  _id?: ObjectId;
   nit: string;
   nrc: string;
   nombre: string;
-  codActividad?: string;
-  descActividad?: string;
-  nombreComercial?: string;
-  telefono?: string;
-  correo?: string;
-  direccion?: Direccion;
+  direccion: string;
+  email: string;
+  telefono: string;
   activo: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Receptor {
+  nrc: string;
+  nit: string;
+  nombre: string;
+  direccion?: string;
+  correo?: string;
+  telefono?: string;
 }
 
 export interface ReceptorDTO {
-  receptor: {
-    nit: string;
-    nrc: string;
-    nombre: string;
-    codActividad: string;
-    descActividad: string;
-    nombreComercial: string;
-    telefono: string;
-    correo: string;
-    direccion: {
-      departamento: string;
-      municipio: string;
-      complemento: string;
-    };
-  };
+  receptor: Receptor;
 }

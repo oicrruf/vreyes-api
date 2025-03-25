@@ -12,8 +12,10 @@
     "deploy": "npm run build && pm2 start ecosystem.config.js"
   },
   "dependencies": {
+    "@typegoose/typegoose": "^12.14.0",
     "@types/imap": "^0.8.42",
     "@types/mailparser": "^3.4.5",
+    "@types/mongodb": "^4.0.6",
     "@types/nodemailer": "^6.4.17",
     "axios": "^1.8.4",
     "dotenv": "^10.0.0",
@@ -21,6 +23,8 @@
     "imap": "^0.8.19",
     "json2csv": "^6.0.0-alpha.2",
     "mailparser": "^3.7.2",
+    "mongodb": "^6.15.0",
+    "mongoose": "^8.13.0",
     "node-cron": "^3.0.3",
     "node-pop3": "^0.9.0",
     "nodemailer": "^6.10.0",
@@ -30,6 +34,7 @@
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/json2csv": "^5.0.7",
+    "@types/mongoose": "^5.11.96",
     "@types/node-cron": "^3.0.11",
     "@types/pdf-parse": "^1.1.4",
     "nodemon": "^3.1.9",

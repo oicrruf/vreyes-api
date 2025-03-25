@@ -5,7 +5,7 @@ import {
   createCliente,
   updateCliente,
   deleteCliente,
-  createClienteFromReceptor,
+  getClienteById,
 } from "../services/clienteService";
 import { ReceptorDTO } from "../types";
 
@@ -13,6 +13,7 @@ export function setClienteRoutes(app: Express) {
   // Get all clientes
   app.get("/api/clientes", (async (req: Request, res: Response) => {
     try {
+      // Database connection is handled internally by getClientes()
       const clientes = await getClientes();
       res.status(200).json({ success: true, data: clientes });
     } catch (error) {
@@ -23,10 +24,10 @@ export function setClienteRoutes(app: Express) {
     }
   }) as RequestHandler);
 
-  // Create a new cliente from receptor data
-  app.post("/api/clientes/receptor", (async (req: Request, res: Response) => {
+  // Create a new cliente
+  app.post("/api/clientes", (async (req: Request, res: Response) => {
     try {
-      console.log("Received request to create cliente from receptor");
+      console.log("Received request to create cliente");
       const receptorData = req.body as ReceptorDTO;
 
       if (!receptorData.receptor) {
@@ -47,32 +48,33 @@ export function setClienteRoutes(app: Express) {
         });
       }
 
-      const newCliente = await createClienteFromReceptor(receptorData);
+      const { receptor } = receptorData;
+      const now = new Date();
+
+      const cliente = {
+        nit: receptor.nit,
+        nrc: receptor.nrc,
+        nombre: receptor.nombre,
+        direccion: receptor.direccion || "",
+        email: receptor.correo || "",
+        telefono: receptor.telefono || "",
+        activo: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const newCliente = await createCliente(cliente);
       res.status(201).json({
         success: true,
         message: "Cliente created successfully",
         data: newCliente,
       });
     } catch (error) {
-      logToFile(`Error creating cliente from receptor: ${error}`, "error");
+      logToFile(`Error creating cliente: ${error}`, "error");
       res.status(500).json({
         success: false,
-        message: "Error creating cliente from receptor data",
+        message: "Error creating cliente",
       });
-    }
-  }) as RequestHandler);
-
-  // Create a new cliente
-  app.post("/api/clientes", (async (req: Request, res: Response) => {
-    try {
-      const cliente = req.body;
-      const newCliente = await createCliente(cliente);
-      res.status(201).json({ success: true, data: newCliente });
-    } catch (error) {
-      logToFile(`Error creating cliente: ${error}`, "error");
-      res
-        .status(500)
-        .json({ success: false, message: "Error creating cliente" });
     }
   }) as RequestHandler);
 
@@ -81,7 +83,7 @@ export function setClienteRoutes(app: Express) {
     try {
       const { id } = req.params;
       const cliente = req.body;
-      const updatedCliente = await updateCliente(parseInt(id), cliente);
+      const updatedCliente = await updateCliente(id, cliente);
       res.status(200).json({ success: true, data: updatedCliente });
     } catch (error) {
       logToFile(`Error updating cliente: ${error}`, "error");
@@ -95,15 +97,25 @@ export function setClienteRoutes(app: Express) {
   app.delete("/api/clientes/:id", (async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      await deleteCliente(parseInt(id));
-      res
-        .status(200)
-        .json({ success: true, message: "Cliente deleted successfully" });
+      const result = await deleteCliente(id);
+
+      if (!result) {
+        return res.status(404).json({
+          success: false,
+          message: `Cliente with ID ${id} not found or could not be deleted`,
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Cliente deleted successfully",
+      });
     } catch (error) {
       logToFile(`Error deleting cliente: ${error}`, "error");
-      res
-        .status(500)
-        .json({ success: false, message: "Error deleting cliente" });
+      res.status(500).json({
+        success: false,
+        message: "Error deleting cliente",
+      });
     }
   }) as RequestHandler);
 
@@ -127,6 +139,29 @@ export function setClienteRoutes(app: Express) {
       res.status(500).json({
         success: false,
         message: "Error finding cliente by NRC",
+      });
+    }
+  }) as RequestHandler);
+
+  // Get cliente by ID
+  app.get("/api/clientes/:id", (async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const cliente = await getClienteById(id);
+
+      if (!cliente) {
+        return res.status(404).json({
+          success: false,
+          message: `Cliente with ID ${id} not found`,
+        });
+      }
+
+      res.status(200).json({ success: true, data: cliente });
+    } catch (error) {
+      logToFile(`Error fetching cliente by ID: ${error}`, "error");
+      res.status(500).json({
+        success: false,
+        message: "Error fetching cliente by ID",
       });
     }
   }) as RequestHandler);

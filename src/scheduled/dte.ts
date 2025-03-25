@@ -105,86 +105,86 @@ export const initializeCronJobs = (): void => {
     activeJobs.push(monthlyJob);
     logWithTimestamp("Monthly DTE email sender job initialized");
 
-    // Job de keepalive cada 6 horas, con énfasis en horas críticas
-    const keepaliveJob = cron.schedule(
-      "0 */6 * * *",
-      () => {
-        logWithTimestamp("Keepalive check - cron jobs are running");
+    // // Job de keepalive cada 6 horas, con énfasis en horas críticas
+    // const keepaliveJob = cron.schedule(
+    //   "0 */6 * * *",
+    //   () => {
+    //     logWithTimestamp("Keepalive check - cron jobs are running");
 
-        // Verificar estado de los jobs y reiniciarlos para asegurar funcionamiento
-        activeJobs.forEach((job, index) => {
-          try {
-            // Restart anyway to ensure it's running
-            job.stop();
-            job.start();
-            logWithTimestamp(`Job #${index} restarted successfully`);
-          } catch (error) {
-            logWithTimestamp(`Error restarting job #${index}: ${error}`);
-          }
-        });
-      },
-      {
-        scheduled: true,
-        timezone: TIMEZONE,
-      }
-    );
-    activeJobs.push(keepaliveJob);
+    //     // Verificar estado de los jobs y reiniciarlos para asegurar funcionamiento
+    //     activeJobs.forEach((job, index) => {
+    //       try {
+    //         // Restart anyway to ensure it's running
+    //         job.stop();
+    //         job.start();
+    //         logWithTimestamp(`Job #${index} restarted successfully`);
+    //       } catch (error) {
+    //         logWithTimestamp(`Error restarting job #${index}: ${error}`);
+    //       }
+    //     });
+    //   },
+    //   {
+    //     scheduled: true,
+    //     timezone: TIMEZONE,
+    //   }
+    // );
+    // activeJobs.push(keepaliveJob);
 
-    // Keepalive adicional para periodo crítico nocturno (11pm-1am)
-    const nightCriticalKeepalive = cron.schedule(
-      "0 23,0,1 * * *",
-      () => {
-        logWithTimestamp(
-          "Critical night period keepalive check - ensuring jobs are running"
-        );
-        activeJobs.forEach((job, index) => {
-          try {
-            // Just restart to ensure it's running
-            job.start();
-            logWithTimestamp(`Critical time: Job #${index} ensured active`);
-          } catch (error) {
-            logWithTimestamp(
-              `Critical time: Error ensuring job #${index}: ${error}`
-            );
-          }
-        });
-      },
-      {
-        scheduled: true,
-        timezone: TIMEZONE,
-      }
-    );
-    activeJobs.push(nightCriticalKeepalive);
+    // // Keepalive adicional para periodo crítico nocturno (11pm-1am)
+    // const nightCriticalKeepalive = cron.schedule(
+    //   "0 23,0,1 * * *",
+    //   () => {
+    //     logWithTimestamp(
+    //       "Critical night period keepalive check - ensuring jobs are running"
+    //     );
+    //     activeJobs.forEach((job, index) => {
+    //       try {
+    //         // Just restart to ensure it's running
+    //         job.start();
+    //         logWithTimestamp(`Critical time: Job #${index} ensured active`);
+    //       } catch (error) {
+    //         logWithTimestamp(
+    //           `Critical time: Error ensuring job #${index}: ${error}`
+    //         );
+    //       }
+    //     });
+    //   },
+    //   {
+    //     scheduled: true,
+    //     timezone: TIMEZONE,
+    //   }
+    // );
+    // activeJobs.push(nightCriticalKeepalive);
 
-    // Keepalive adicional para periodo crítico del primer día del mes (7am-9am)
-    const monthlyKeepalive = cron.schedule(
-      "0 7,8,9 1 * *",
-      () => {
-        logWithTimestamp(
-          "Critical first-of-month morning period keepalive check"
-        );
-        activeJobs.forEach((job, index) => {
-          try {
-            // Just restart to ensure it's running
-            job.start();
-            logWithTimestamp(`Critical time: Job #${index} ensured active`);
-          } catch (error) {
-            logWithTimestamp(
-              `Critical time: Error ensuring job #${index}: ${error}`
-            );
-          }
-        });
-      },
-      {
-        scheduled: true,
-        timezone: TIMEZONE,
-      }
-    );
-    activeJobs.push(monthlyKeepalive);
+    // // Keepalive adicional para periodo crítico del primer día del mes (7am-9am)
+    // const monthlyKeepalive = cron.schedule(
+    //   "0 7,8,9 1 * *",
+    //   () => {
+    //     logWithTimestamp(
+    //       "Critical first-of-month morning period keepalive check"
+    //     );
+    //     activeJobs.forEach((job, index) => {
+    //       try {
+    //         // Just restart to ensure it's running
+    //         job.start();
+    //         logWithTimestamp(`Critical time: Job #${index} ensured active`);
+    //       } catch (error) {
+    //         logWithTimestamp(
+    //           `Critical time: Error ensuring job #${index}: ${error}`
+    //         );
+    //       }
+    //     });
+    //   },
+    //   {
+    //     scheduled: true,
+    //     timezone: TIMEZONE,
+    //   }
+    // );
+    // activeJobs.push(monthlyKeepalive);
 
-    logWithTimestamp(
-      "Keepalive jobs initialized with 6-hour intervals and critical time coverage"
-    );
+    // logWithTimestamp(
+    //   "Keepalive jobs initialized with 6-hour intervals and critical time coverage"
+    // );
 
     logWithTimestamp(
       `All cron jobs initialized successfully in timezone: ${TIMEZONE}`
