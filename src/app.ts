@@ -4,6 +4,7 @@ import { setDteRoutes } from "./modules/dte/routes";
 import { initializeCronJobs } from "./scheduled/dte";
 import { initializeClienteModule } from "./modules/cliente";
 import { connectToDatabase } from "./config/database";
+import catalogRouter from "./modules/catalog/routes/catalog.routes";
 
 dotenv.config();
 
@@ -15,6 +16,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Set up routes
 setDteRoutes(app);
+
+// Inicialización de rutas
+app.use("/api", catalogRouter);
 
 // Initialize modules
 initializeClienteModule(app);
