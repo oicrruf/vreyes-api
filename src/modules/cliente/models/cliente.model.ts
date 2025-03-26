@@ -1,61 +1,45 @@
-import {
-  prop,
-  getModelForClass,
-  modelOptions,
-  Severity,
-} from "@typegoose/typegoose";
-import { BaseModel } from "../../../models/base.model";
+import mongoose, { Schema, Document } from "mongoose";
 
-class Direccion {
-  @prop({ required: true })
-  public departamento!: string;
+export interface ICliente extends Document {
+  nit: string;
+  nrc: string;
+  nombre: string;
+  nombreComercial: string;
+  direccion: string;
+  departamento: string;
+  municipio: string;
+  email: string;
+  telefono: string;
+  tipoContribuyente: string;
+  condicionPago: string;
+  metodoPago: string;
+  activo: boolean;
 
-  @prop({ required: true })
-  public municipio!: string;
-
-  @prop()
-  public complemento?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-@modelOptions({
-  schemaOptions: {
-    collection: "clientes",
+const ClienteSchema = new Schema(
+  {
+    nit: { type: String, required: true },
+    nrc: { type: String, required: true, unique: true },
+    nombre: { type: String, required: true },
+    nombreComercial: { type: String },
+    direccion: { type: String },
+    departamento: { type: String },
+    municipio: { type: String },
+    email: { type: String },
+    telefono: { type: String },
+    tipoContribuyente: {
+      type: String,
+      enum: ["grande", "mediano", "pequeño", "otro"],
+      default: "otro",
+    },
+    condicionPago: { type: String, default: "contado" },
+    metodoPago: { type: String, default: "efectivo" },
+    activo: { type: Boolean, default: true },
   },
-  options: {
-    allowMixed: Severity.ALLOW,
-  },
-})
-export class Cliente extends BaseModel {
-  @prop({ required: true, unique: true })
-  public nrc!: string;
+  { timestamps: true }
+);
 
-  @prop({ required: true })
-  public nit!: string;
-
-  @prop({ required: true })
-  public nombre!: string;
-
-  @prop()
-  public codActividad?: string;
-
-  @prop()
-  public descActividad?: string;
-
-  @prop()
-  public nombreComercial?: string;
-
-  @prop()
-  public telefono?: string;
-
-  @prop()
-  public correo?: string;
-
-  @prop({ type: () => Direccion })
-  public direccion?: Direccion;
-
-  @prop({ default: true })
-  public activo: boolean = true;
-}
-
-// Exporta el modelo para usar en servicios
-export const ClienteModel = getModelForClass(Cliente);
+export default mongoose.model<ICliente>("Cliente", ClienteSchema);

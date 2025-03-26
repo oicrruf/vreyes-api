@@ -12,12 +12,20 @@ export interface Cliente {
   nit: string;
   nrc: string;
   nombre: string;
+  nombreComercial?: string;
   direccion: string;
+  departamento?: string;
+  municipio?: string;
   email: string;
   telefono: string;
+  tipoContribuyente?: "grande" | "mediano" | "pequeño" | "otro";
+  condicionPago?: string;
+  metodoPago?: string;
   activo: boolean;
+  documento: string; // Add this field to match database schema
   createdAt: Date;
   updatedAt: Date;
+  facturas?: ObjectId[];
 }
 
 export interface Receptor {
@@ -31,4 +39,10 @@ export interface Receptor {
 
 export interface ReceptorDTO {
   receptor: Receptor;
+  tipoContribuyente?: "grande" | "mediano" | "pequeño" | "otro";
+  nombreComercial?: string;
+  condicionPago?: string;
+  metodoPago?: string;
+  departamento?: string;
+  municipio?: string;
 }

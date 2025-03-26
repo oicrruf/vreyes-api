@@ -6,7 +6,7 @@ import {
   updateCliente,
   deleteCliente,
   getClienteById,
-} from "../services/clienteService";
+} from "../services/cliente.service";
 import { ReceptorDTO } from "../types";
 
 export function setClienteRoutes(app: Express) {
@@ -28,6 +28,11 @@ export function setClienteRoutes(app: Express) {
   app.post("/api/clientes", (async (req: Request, res: Response) => {
     try {
       console.log("Received request to create cliente");
+      logToFile(
+        `Creating cliente with data: ${JSON.stringify(req.body)}`,
+        "info"
+      );
+
       const receptorData = req.body as ReceptorDTO;
 
       if (!receptorData.receptor) {
@@ -59,21 +64,35 @@ export function setClienteRoutes(app: Express) {
         email: receptor.correo || "",
         telefono: receptor.telefono || "",
         activo: true,
+        documento: receptor.nit, // Set documento equal to nit to ensure uniqueness
         createdAt: now,
         updatedAt: now,
       };
 
-      const newCliente = await createCliente(cliente);
-      res.status(201).json({
-        success: true,
-        message: "Cliente created successfully",
-        data: newCliente,
-      });
-    } catch (error) {
-      logToFile(`Error creating cliente: ${error}`, "error");
+      try {
+        const newCliente = await createCliente(cliente);
+        res.status(201).json({
+          success: true,
+          message: "Cliente created successfully",
+          data: newCliente,
+        });
+      } catch (createError: any) {
+        if (createError.message?.includes("already exists")) {
+          return res.status(409).json({
+            success: false,
+            message: createError.message,
+          });
+        } else {
+          throw createError;
+        }
+      }
+    } catch (error: any) {
+      const errorMessage = error.message || "Unknown error";
+      logToFile(`Error creating cliente: ${errorMessage}`, "error");
       res.status(500).json({
         success: false,
         message: "Error creating cliente",
+        details: errorMessage,
       });
     }
   }) as RequestHandler);

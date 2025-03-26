@@ -5,6 +5,7 @@ import { initializeCronJobs } from "./scheduled/dte";
 import { initializeClienteModule } from "./modules/cliente";
 import { connectToDatabase } from "./config/database";
 import catalogRouter from "./modules/catalog/routes/catalog.routes";
+import ventasRoutes from "./modules/ventas/routes/ventas.routes";
 
 dotenv.config();
 
@@ -14,11 +15,16 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Import models in correct order - Cliente before Venta
+import "./modules/cliente/models/cliente.model";
+import "./modules/ventas/models/venta.model";
+
 // Set up routes
 setDteRoutes(app);
 
 // Inicialización de rutas
 app.use("/api", catalogRouter);
+app.use("/api/ventas", ventasRoutes);
 
 // Initialize modules
 initializeClienteModule(app);
