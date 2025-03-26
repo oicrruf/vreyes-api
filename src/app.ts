@@ -1,5 +1,6 @@
 import express, { Express } from "express";
 import dotenv from "dotenv";
+import cors from "cors";
 import { setDteRoutes } from "./modules/dte/routes";
 import { initializeCronJobs } from "./scheduled/dte";
 import { initializeClienteModule } from "./modules/cliente";
@@ -11,6 +12,17 @@ dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
+
+// Configure CORS
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || "http://localhost:9000", // Allow requests from our React app
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
