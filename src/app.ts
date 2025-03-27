@@ -7,6 +7,7 @@ import { initializeClienteModule } from "./modules/cliente";
 import { connectToDatabase } from "./config/database";
 import catalogRouter from "./modules/catalog/routes/catalog.routes";
 import ventasRoutes from "./modules/ventas/routes/ventas.routes";
+import { dashboardRoutes } from "./modules/dashboard";
 
 dotenv.config();
 
@@ -37,6 +38,12 @@ setDteRoutes(app);
 // Inicialización de rutas
 app.use("/api", catalogRouter);
 app.use("/api/ventas", ventasRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+
+// Add a root route handler
+app.get("/", (req, res) => {
+  res.status(200).json({ message: "Auto Task API is running" });
+});
 
 // Initialize modules
 initializeClienteModule(app);
