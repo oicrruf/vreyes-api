@@ -1,12 +1,12 @@
 import { IVentaItem } from "../interfaces/venta.interface";
 
 export class CreateVentaDto {
-  tipo: "FACTURA" | "CCF";
-  numeroDocumento: string;
-  fecha: Date;
-  clienteId: string;
-  items: IVentaItem[];
-  subtotal: number;
-  iva: number;
-  total: number;
+  tipo: "FACTURA" | "CCF" = "FACTURA";
+  numeroDocumento: string = "";
+  fecha: Date = new Date();
+  clienteId: string = "";
+  items: IVentaItem[] = [];
+  subtotal: number = 0;
+  iva: number = 0;
+  total: number = 0;
 }

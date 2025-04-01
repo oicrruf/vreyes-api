@@ -4,7 +4,7 @@ import cors from "cors";
 import { setDteRoutes } from "./modules/dte/routes";
 import { initializeCronJobs } from "./scheduled/dte";
 import { initializeClienteModule } from "./modules/cliente";
-import { connectToDatabase } from "./config/database";
+// import { connectToDatabase } from "./config/database";
 import catalogRouter from "./modules/catalog/routes/catalog.routes";
 import ventasRoutes from "./modules/ventas/routes/ventas.routes";
 import { dashboardRoutes } from "./modules/dashboard";
@@ -54,7 +54,7 @@ initializeCronJobs();
 // Conectar a la base de datos antes de iniciar el servidor
 const startServer = async () => {
   try {
-    await connectToDatabase();
+    // await connectToDatabase();
 
     // Iniciar el servidor después de conectar a la base de datos
     app.listen(PORT, () => {
