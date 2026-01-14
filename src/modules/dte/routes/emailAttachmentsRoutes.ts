@@ -1,6 +1,5 @@
 import { Express, RequestHandler } from "express";
 import { sendFilesViaEmail } from "../services/emailService";
-import { getPreviousMonthPath } from "../utils/fileUtils";
 import path from "path";
 import fs from "fs";
 import { Parser } from "json2csv";
@@ -10,7 +9,7 @@ export function setEmailAttachmentsRoutes(app: Express) {
   // Endpoint to send current month's files via email
   app.post("/api/attachments/dte/email", (async (req, res) => {
     try {
-      const { subject, message } = req.body;
+      const { subject, message, year, month } = req.body;
 
       // Parse recipients from environment variable
       const recipients = process.env.RECIPIENT_EMAIL
@@ -24,46 +23,71 @@ export function setEmailAttachmentsRoutes(app: Express) {
         });
       }
 
+      // Determine target year and month
+      let targetYear, targetMonth;
+      if (year && month) {
+        targetYear = year.toString();
+        targetMonth = month.toString().padStart(2, "0");
+      } else {
+        // Default to previous month
+        const now = new Date();
+        const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1);
+        targetYear = previousMonth.getFullYear().toString();
+        targetMonth = (previousMonth.getMonth() + 1).toString().padStart(2, "0");
+      }
+
       // Log recipients for debugging
       logToFile(
-        `Sending email to ${recipients.length} recipients: ${recipients.join(
+        `Sending email for ${targetYear}-${targetMonth} to ${recipients.length} recipients: ${recipients.join(
           ", "
         )}`
       );
 
-      // Use previous month's path instead of current month
-      const previousMonthPath = getPreviousMonthPath();
-      if (!fs.existsSync(previousMonthPath)) {
-        fs.mkdirSync(previousMonthPath, { recursive: true });
+      // Base attachments path
+      const basePath = process.env.ATTACHMENTS_PATH || "./attachments";
+
+      // Paths for compras and ventas
+      const comprasPath = path.join(basePath, targetYear, targetMonth, "compras");
+      const ventasPath = path.join(basePath, targetYear, targetMonth, "ventas");
+
+      // Check if compras folder exists (it's the main one)
+      if (!fs.existsSync(comprasPath)) {
         return res.status(404).json({
           success: false,
-          error: "No files found for the previous month",
-          path: previousMonthPath,
+          error: `No 'compras' folder found for ${targetYear}-${targetMonth}`,
+          path: comprasPath,
         });
       }
 
-      // Get all PDF files from previous month
-      const pdfFiles = fs
-        .readdirSync(previousMonthPath)
-        .filter((file) => file.toLowerCase().endsWith(".pdf"))
-        .map((filename) => path.join(previousMonthPath, filename));
+      // Helper to valid PDF files
+      const getPdfFiles = (dir: string) => {
+        if (!fs.existsSync(dir)) return [];
+        return fs.readdirSync(dir)
+          .filter(file => file.toLowerCase().endsWith(".pdf"))
+          .map(filename => path.join(dir, filename));
+      }
 
-      // Get all JSON files from previous month
+      // Get PDF files from both folders
+      const comprasPdfs = getPdfFiles(comprasPath);
+      const ventasPdfs = getPdfFiles(ventasPath);
+      const allPdfFiles = [...comprasPdfs, ...ventasPdfs];
+
+      // Get JSON files ONLY from compras for CSV
       const jsonFiles = fs
-        .readdirSync(previousMonthPath)
+        .readdirSync(comprasPath)
         .filter((file) => file.toLowerCase().endsWith(".json"))
-        .map((filename) => path.join(previousMonthPath, filename));
+        .map((filename) => path.join(comprasPath, filename));
 
-      if (pdfFiles.length === 0) {
+      if (allPdfFiles.length === 0) {
         return res.status(404).json({
           success: false,
-          error: "No PDF files found to send for the previous month",
-          path: previousMonthPath,
+          error: "No PDF files found to send (checked compras and ventas)",
+          path: `${comprasPath} & ${ventasPath}`,
         });
       }
 
       logToFile(
-        `Found ${jsonFiles.length} JSON files and ${pdfFiles.length} PDF files for the previous month`
+        `Found ${jsonFiles.length} JSON files (compras), ${comprasPdfs.length} PDF files (compras) and ${ventasPdfs.length} PDF files (ventas)`
       );
 
       // Process JSON files to generate CSV
@@ -137,20 +161,27 @@ export function setEmailAttachmentsRoutes(app: Express) {
       });
 
       const csv = csvParser.parse(jsonValues);
-      const csvFileName = `COMPRAS-${getPreviousMonthName().toUpperCase()}-${new Date().getFullYear()}.csv`;
-      const csvFilePath = path.join(previousMonthPath, csvFileName);
+
+      // Determine file name based on target month
+      const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+      const monthName = monthNames[parseInt(targetMonth) - 1]; // targetMonth is 1-based string
+
+      const csvFileName = `COMPRAS-${monthName.toUpperCase()}-${targetYear}.csv`;
+
+      // Save CSV in compras path
+      const csvFilePath = path.join(comprasPath, csvFileName);
       fs.writeFileSync(csvFilePath, csv);
 
-      // Files to send (PDF files and CSV)
-      const filesToSend = [...pdfFiles, csvFilePath];
+      // Files to send (All PDFs and CSV)
+      const filesToSend = [...allPdfFiles, csvFilePath];
 
       // Send email using recipients from environment variable
       const result = await sendFilesViaEmail(
         recipients,
         filesToSend,
-        subject || `${getPreviousYearAndMonth()}: CCF de Víctor M. Reyes`,
+        subject || `${targetYear}-${targetMonth}: CCF de Víctor M. Reyes`,
         message ||
-          `Adjunto envío los Comprobantes de Crédito Fiscal correspondientes al mes de ${getPreviousMonthName()}.`
+        `Adjunto envío los Comprobantes de Crédito Fiscal correspondientes al mes de ${monthName}.`
       );
 
       if (result.success) {
@@ -169,9 +200,8 @@ export function setEmailAttachmentsRoutes(app: Express) {
 
         res.status(200).json({
           success: true,
-          message: `Sent ${
-            filesToSend.length
-          } files via email to ${recipients.join(", ")}`,
+          message: `Sent ${filesToSend.length
+            } files via email to ${recipients.join(", ")}`,
           sentFiles: filesToSend.map((f) => path.basename(f)),
           deletedJsonFiles: jsonFiles.map((f) => path.basename(f)),
           result,
@@ -191,34 +221,6 @@ export function setEmailAttachmentsRoutes(app: Express) {
     }
   }) as RequestHandler);
 }
-
-/**
- * Capitalize the first letter of a string
- */
-const capitalizeFirstLetter = (text: string): string => {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-};
-
-/**
- * Get the previous year and month in the format "añomes"
- */
-const getPreviousYearAndMonth = (): string => {
-  const now = new Date();
-  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1);
-  const year = previousMonth.getFullYear();
-  const month = (previousMonth.getMonth() + 1).toString().padStart(2, "0");
-  return `${year}-${month}`;
-};
-
-/**
- * Get the name of the previous month in Spanish with the first letter capitalized
- */
-const getPreviousMonthName = (): string => {
-  const now = new Date();
-  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1);
-  const monthName = previousMonth.toLocaleString("es-ES", { month: "long" });
-  return monthName.charAt(0).toUpperCase() + monthName.slice(1);
-};
 
 /**
  * Format date as DD/MM/YYYY
