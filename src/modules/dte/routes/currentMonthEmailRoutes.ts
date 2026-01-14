@@ -14,21 +14,26 @@ export function setCurrentMonthEmailRoutes(app: Express) {
   // Endpoint to get emails from the current month
   app.post("/api/emails/current-month", (async (req, res) => {
     try {
-      const result: EmailResponse = await listCurrentMonthEmails();
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+
+      // Validate month if provided
+      if (month && (month < 1 || month > 12)) {
+        return res.status(400).json({ success: false, message: "Month must be between 1 and 12" });
+      }
+
+      logToFile(`Fetching emails for date range: Year=${year || "current"}, Month=${month || "current"}`);
+
+      const result: EmailResponse = await listCurrentMonthEmails(year, month);
 
       if (result.success && result.data) {
-        // Filter emails with "Documento Tributario" in the subject (case-insensitive)
-        const filteredEmails = result.data.filter(
-          (email) =>
-            email.subject &&
-            email.subject
-              .toLowerCase()
-              .includes("documento tributario".toLowerCase())
-        );
+        // We no longer filter by subject "Documento Tributario"
+        // We process all emails in the range, relying on NRC to filter attachments
+        const filteredEmails = result.data;
 
         // Log to file instead of console
         logToFile(
-          `Found ${filteredEmails.length} emails with "Documento Tributario" in subject`
+          `Found ${filteredEmails.length} emails in the specified date range`
         );
 
         // Process and save attachments for filtered emails
@@ -80,7 +85,8 @@ export function setCurrentMonthEmailRoutes(app: Express) {
 
               // Save the JSON attachment directly to the month directory
               logToFile(`Saving JSON attachment from email: ${email.subject}`);
-              const savedJsonPath = saveAttachment(jsonAttachment);
+              // Pass year and month to saveAttachment
+              const savedJsonPath = saveAttachment(jsonAttachment, undefined, year, month);
               let jsonFilename: string | undefined = undefined;
 
               if (savedJsonPath) {
@@ -96,7 +102,8 @@ export function setCurrentMonthEmailRoutes(app: Express) {
               email.attachments.forEach((attachment) => {
                 if (attachment.filename?.toLowerCase().endsWith(".pdf")) {
                   logToFile(`Saving PDF attachment: ${attachment.filename}`);
-                  const savedPath = saveAttachment(attachment);
+                  // Pass year and month to saveAttachment
+                  const savedPath = saveAttachment(attachment, undefined, year, month);
                   if (savedPath) {
                     logToFile(`PDF attachment saved to: ${savedPath}`);
                     // Extract just the filename from the path

@@ -68,11 +68,14 @@ export const filterEmailsByTerm = (
   });
 };
 
-// Get the current month's date range
-const getCurrentMonthDateRange = () => {
+// Get date range for specific month and year
+const getDateRangeForMonth = (year?: number, month?: number) => {
   const now = new Date();
-  const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const targetYear = year || now.getFullYear();
+  const targetMonth = month ? month - 1 : now.getMonth(); // 0-indexed month
+
+  const firstDay = new Date(targetYear, targetMonth, 1);
+  const lastDay = new Date(targetYear, targetMonth + 1, 0);
 
   return {
     after: firstDay,
@@ -132,8 +135,11 @@ export const extractNrcFromEmail = (emailData: EmailData): EmailData => {
   return emailData;
 };
 
-// List emails from the current month
-export const listCurrentMonthEmails = (): Promise<EmailResponse> => {
+// List emails from the specified month (defaults to current)
+export const listCurrentMonthEmails = (
+  year?: number,
+  month?: number
+): Promise<EmailResponse> => {
   return new Promise((resolve, reject) => {
     const imap = createImapConnection();
     const emails: EmailData[] = [];
@@ -145,7 +151,7 @@ export const listCurrentMonthEmails = (): Promise<EmailResponse> => {
           return reject({ success: false, error: "Failed to open inbox" });
         }
 
-        const { after, before } = getCurrentMonthDateRange();
+        const { after, before } = getDateRangeForMonth(year, month);
 
         const searchCriteria = [
           ["SINCE", after.toISOString().split("T")[0]],

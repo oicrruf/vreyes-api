@@ -10,17 +10,20 @@ export interface PdfSearchResult {
 
 export const saveAttachment = (
   attachment: any,
-  customBasePath?: string
+  customBasePath?: string,
+  targetYear?: number,
+  targetMonth?: number
 ): string => {
   try {
     const basePath =
       customBasePath || process.env.ATTACHMENTS_PATH || "./downloads";
 
     const now = new Date();
-    const year = now.getFullYear().toString();
-    const month = (now.getMonth() + 1).toString().padStart(2, "0");
+    // Use provided year/month or fall back to current
+    const year = (targetYear || now.getFullYear()).toString();
+    const month = (targetMonth || now.getMonth() + 1).toString().padStart(2, "0");
 
-    const dirPath = path.join(basePath, year, month);
+    const dirPath = path.join(basePath, year, month, "compras");
 
     // Ensure directory exists
     if (!fs.existsSync(dirPath)) {
