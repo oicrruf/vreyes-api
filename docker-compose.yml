@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: auto-task-api
+    restart: always
+    ports:
+      - "${PORT:-3001}:${PORT:-3001}"
+    environment:
+      - PUID=1002
+      - PGID=100
+      - PORT=${PORT:-3001}
+      - GMAIL_USER=${GMAIL_USER}
+      - GMAIL_PASS=${GMAIL_PASS}
+      - ATTACHMENTS_PATH=${ATTACHMENTS_PATH}
+      - RECIPIENT_EMAIL=${RECIPIENT_EMAIL}
+      - RECEPTOR_NRC=${RECEPTOR_NRC}
+    env_file:
+      - .env
+    volumes:
+      - /home/vreyes/Documents/dte:/usr/src/app/attachments
+      - /home/vreyes/Documents/dte:/usr/src/app/logs
