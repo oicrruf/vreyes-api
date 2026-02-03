@@ -3,16 +3,13 @@ import dotenv from "dotenv";
 import cors from "cors";
 import { setDteRoutes } from "./modules/dte/routes";
 import { initializeCronJobs } from "./scheduled/dte";
-import { initializeClienteModule } from "./modules/cliente";
-// import { connectToDatabase } from "./config/database";
-import catalogRouter from "./modules/catalog/routes/catalog.routes";
-import ventasRoutes from "./modules/ventas/routes/ventas.routes";
-import { dashboardRoutes } from "./modules/dashboard";
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./config/swagger";
 
 dotenv.config();
 
 const app: Express = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Configure CORS
 const corsOptions = {
@@ -28,42 +25,21 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Import models in correct order - Cliente before Venta
-import "./modules/cliente/models/cliente.model";
-import "./modules/ventas/models/venta.model";
-
 // Set up routes
 setDteRoutes(app);
 
-// Inicialización de rutas
-app.use("/api", catalogRouter);
-app.use("/api/ventas", ventasRoutes);
-app.use("/api/dashboard", dashboardRoutes);
+// Swagger documentation route
+app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Add a root route handler
 app.get("/", (req, res) => {
   res.status(200).json({ message: "Auto Task API is running" });
 });
 
-// Initialize modules
-initializeClienteModule(app);
-
 // Initialize cron jobs
 initializeCronJobs();
 
-// Conectar a la base de datos antes de iniciar el servidor
-const startServer = async () => {
-  try {
-    // await connectToDatabase();
-
-    // Iniciar el servidor después de conectar a la base de datos
-    app.listen(PORT, () => {
-      console.log(`Server is running on http://localhost:${PORT}`);
-    });
-  } catch (error) {
-    console.error("Failed to start server:", error);
-    process.exit(1);
-  }
-};
-
-startServer();
+// Iniciar el servidor
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});

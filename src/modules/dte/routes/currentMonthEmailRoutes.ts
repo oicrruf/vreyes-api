@@ -11,6 +11,31 @@ import {
 import { logToFile } from "../utils/logUtils";
 
 export function setCurrentMonthEmailRoutes(app: Express) {
+  /**
+   * @swagger
+   * /api/emails/current-month:
+   *   post:
+   *     summary: Obtiene correos del mes especificado y descarga adjuntos (DTE).
+   *     tags: [Emails]
+   *     parameters:
+   *       - in: query
+   *         name: year
+   *         schema:
+   *           type: integer
+   *         description: Año a consultar (ej. 2026). Si se omite, usa el año actual.
+   *       - in: query
+   *         name: month
+   *         schema:
+   *           type: integer
+   *         description: Mes a consultar (1-12). Si se omite, usa el mes actual.
+   *     responses:
+   *       200:
+   *         description: Correos procesados con éxito.
+   *       400:
+   *         description: Parámetros inválidos.
+   *       500:
+   *         description: Error interno o de configuración (RECEPTOR_NRC faltante).
+   */
   // Endpoint to get emails from the current month
   app.post("/api/emails/current-month", (async (req, res) => {
     try {

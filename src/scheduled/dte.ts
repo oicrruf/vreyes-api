@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const API_URL = process.env.API_URL || "http://localhost:3000";
+const API_URL = process.env.API_URL || "http://localhost:3001";
 // Array para mantener referencia a los jobs activos
 const activeJobs: ReturnType<typeof cron.schedule>[] = [];
 // Configura explícitamente la zona horaria
@@ -70,8 +70,8 @@ export const initializeCronJobs = (): void => {
           // Parse comma-separated email addresses
           const recipientEmails = process.env.RECIPIENT_EMAIL
             ? process.env.RECIPIENT_EMAIL.split(",").map((email) =>
-                email.trim()
-              )
+              email.trim()
+            )
             : ["default@example.com"];
 
           const body = {

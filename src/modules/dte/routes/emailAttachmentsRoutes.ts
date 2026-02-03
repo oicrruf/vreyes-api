@@ -6,6 +6,38 @@ import { Parser } from "json2csv";
 import { logToFile } from "../utils/logUtils";
 
 export function setEmailAttachmentsRoutes(app: Express) {
+  /**
+   * @swagger
+   * /api/attachments/dte/email:
+   *   post:
+   *     summary: Envía archivos PDF y resumen CSV por correo electrónico.
+   *     tags: [Emails]
+   *     requestBody:
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               year:
+   *                 type: integer
+   *                 description: Año de los archivos.
+   *               month:
+   *                 type: integer
+   *                 description: Mes de los archivos.
+   *               subject:
+   *                 type: string
+   *                 description: Asunto del correo.
+   *               message:
+   *                 type: string
+   *                 description: Cuerpo del mensaje.
+   *     responses:
+   *       200:
+   *         description: Email enviado con éxito.
+   *       404:
+   *         description: No se encontraron archivos para el periodo especificado.
+   *       500:
+   *         description: Error al enviar el correo.
+   */
   // Endpoint to send current month's files via email
   app.post("/api/attachments/dte/email", (async (req, res) => {
     try {

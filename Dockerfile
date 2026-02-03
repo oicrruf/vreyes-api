@@ -1,30 +1,37 @@
-# 1. Usar una imagen ligera de Node
-FROM node:20-alpine
+# Stage 1: Build
+FROM node:20-alpine AS build
 
-# 2. Crear directorio de trabajo
 WORKDIR /usr/src/app
 
-# 3. Copiar archivos de dependencias
+# Copiar archivos de dependencias
 COPY package*.json ./
 
-# 4. Instalar dependencias (incluyendo devDependencies para build)
+# Instalar todas las dependencias (incluyendo devDependencies para el build)
 RUN npm install
 
-# 5. Copiar el resto del código
+# Copiar el resto del código
 COPY . .
 
-# Build de la aplicación TypeScript
+# Generar el build de TypeScript
 RUN npm run build
 
-# Opcional: Limpiar dependencias de desarrollo
-RUN npm prune --production
+# Stage 2: Production
+FROM node:20-alpine
 
-# Definiendo el puerto por defecto o desde argumento
-ARG PORT
-ENV PORT=$PORT
+WORKDIR /usr/src/app
 
-# 6. Exponer el puerto
-EXPOSE $PORT
+# Copiar solo lo necesario desde el stage de build
+COPY --from=build /usr/src/app/package*.json ./
+COPY --from=build /usr/src/app/dist ./dist
 
-# 7. Comando para arrancar
+# Instalar solo dependencias de producción
+RUN npm install --omit=dev
+
+# Crear directorios para volúmenes opcionalmente (Docker los creará si no existen)
+RUN mkdir -p attachments logs
+
+# Exponer el puerto configurado (el 3001 es el nuevo default)
+EXPOSE 3001
+
+# Comando para arrancar en producción
 CMD [ "node", "dist/app.js" ]
