@@ -14,8 +14,8 @@ const options: swaggerJsdoc.Options = {
                 description: "Servidor local",
             },
             {
-                url: "http://192.168.1.160:3001",
-                description: "Servidor NAS",
+                url: "https://api.vreyes.dev",
+                description: "Servidor api.vreyes.dev",
             },
         ],
     },
