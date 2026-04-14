@@ -14,7 +14,7 @@ export function setEmailAttachmentsRoutes(app: Express) {
    *     tags: [Emails]
    *     requestBody:
    *       content:
-   *         application/json:
+   *         application/x-www-form-urlencoded:
    *           schema:
    *             type: object
    *             properties:

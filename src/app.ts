@@ -5,6 +5,7 @@ import { setDteRoutes } from "./modules/dte/routes";
 import { initializeCronJobs } from "./scheduled/dte";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./config/swagger";
+import { authMiddleware } from "./middleware/authMiddleware";
 
 dotenv.config();
 
@@ -24,6 +25,9 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Apply auth middleware to all /api routes
+app.use("/api", authMiddleware);
 
 // Set up routes
 setDteRoutes(app);

@@ -18,6 +18,20 @@ const options: swaggerJsdoc.Options = {
                 description: "Servidor api.vreyes.dev",
             },
         ],
+        components: {
+            securitySchemes: {
+                ApiKeyAuth: {
+                    type: "apiKey",
+                    in: "header",
+                    name: "x-api-key",
+                },
+            },
+        },
+        security: [
+            {
+                ApiKeyAuth: [],
+            },
+        ],
     },
     apis: ["./src/app.ts", "./src/modules/*/routes/*.ts"], // Busca comentarios Swagger en estos archivos
 };
