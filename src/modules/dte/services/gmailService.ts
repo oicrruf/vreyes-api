@@ -145,7 +145,7 @@ export const listCurrentMonthEmails = (
     const emails: EmailData[] = [];
 
     imap.once("ready", () => {
-      imap.openBox("INBOX", true, (err: Error | null, box) => {
+      imap.openBox("INBOX", true, (err: Error | null, box: any) => {
         if (err) {
           imap.end();
           return reject({ success: false, error: "Failed to open inbox" });
@@ -158,7 +158,7 @@ export const listCurrentMonthEmails = (
           ["BEFORE", before.toISOString().split("T")[0]],
         ];
 
-        imap.search(searchCriteria, (err: Error | null, results) => {
+        imap.search(searchCriteria, (err: Error | null, results: any[]) => {
           if (err) {
             imap.end();
             return reject({ success: false, error: "Failed to search emails" });
@@ -178,7 +178,7 @@ export const listCurrentMonthEmails = (
             struct: true,
           });
 
-          fetch.on("message", (msg) => {
+          fetch.on("message", (msg: any) => {
             const emailData: EmailData = {
               uid: 0,
               from: "",
@@ -188,11 +188,11 @@ export const listCurrentMonthEmails = (
               attachments: [],
             };
 
-            msg.on("body", (stream, info) => {
+            msg.on("body", (stream: any, info: any) => {
               if (info.which === "HEADER.FIELDS (FROM TO SUBJECT DATE)") {
                 let buffer = "";
 
-                stream.on("data", (chunk) => {
+                stream.on("data", (chunk: any) => {
                   buffer += chunk.toString("utf8");
                 });
 
@@ -221,7 +221,7 @@ export const listCurrentMonthEmails = (
               }
             });
 
-            msg.once("attributes", (attrs) => {
+            msg.once("attributes", (attrs: any) => {
               emailData.uid = attrs.uid;
             });
 
