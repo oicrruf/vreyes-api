@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum DteType {
+  purchase
+  sale
+}
+
+model Dte {
+  generationCode String   @id @map("generation_code")
+  type           DteType
+  issueDate      String   @map("issue_date")
+  receiverNrc    String   @map("receiver_nrc")
+  issuerNrc      String   @map("issuer_nrc")
+  issuerName     String   @map("issuer_name")
+  exemptTotal    Float    @map("exempt_total")
+  taxableTotal   Float    @map("taxable_total")
+  amountDue      Float    @map("amount_due")
+  taxValue       Float    @map("tax_value")
+  pdfUrl         String?  @map("pdf_url")
+  rawJson        Json     @map("raw_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("dte")
+}

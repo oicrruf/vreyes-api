@@ -5,3 +5,4 @@ node_modules
 dist
 **/scripts
 google-credentials.json
+/src/generated/prisma
