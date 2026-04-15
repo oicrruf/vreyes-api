@@ -1,44 +1,15 @@
 import { Express, RequestHandler } from "express";
-import { sendFilesViaEmail } from "../services/emailService";
-import path from "path";
-import fs from "fs";
+import { sendBuffersViaEmail, BufferAttachment } from "../services/emailService";
+import { 
+  listFilesInDrivePath, 
+  downloadDriveFileToBuffer, 
+  deleteDriveFile 
+} from "../services/driveService";
 import { Parser } from "json2csv";
 import { logToFile } from "../utils/logUtils";
 
 export function setEmailAttachmentsRoutes(app: Express) {
-  /**
-   * @swagger
-   * /api/attachments/dte/email:
-   *   post:
-   *     summary: Envía archivos PDF y resumen CSV por correo electrónico.
-   *     tags: [Emails]
-   *     requestBody:
-   *       content:
-   *         application/x-www-form-urlencoded:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               year:
-   *                 type: integer
-   *                 description: Año de los archivos.
-   *               month:
-   *                 type: integer
-   *                 description: Mes de los archivos.
-   *               subject:
-   *                 type: string
-   *                 description: Asunto del correo.
-   *               message:
-   *                 type: string
-   *                 description: Cuerpo del mensaje.
-   *     responses:
-   *       200:
-   *         description: Email enviado con éxito.
-   *       404:
-   *         description: No se encontraron archivos para el periodo especificado.
-   *       500:
-   *         description: Error al enviar el correo.
-   */
-  // Endpoint to send current month's files via email
+  // Endpoint to send current month's files via email entirely from Google Drive
   app.post("/api/attachments/dte/email", (async (req, res) => {
     try {
       const { subject, message, year, month } = req.body;
@@ -68,79 +39,51 @@ export function setEmailAttachmentsRoutes(app: Express) {
         targetMonth = (previousMonth.getMonth() + 1).toString().padStart(2, "0");
       }
 
-      // Log recipients for debugging
-      logToFile(
-        `Sending email for ${targetYear}-${targetMonth} to ${recipients.length} recipients: ${recipients.join(
-          ", "
-        )}`
-      );
+      logToFile(`Sending email for ${targetYear}-${targetMonth} to ${recipients.length} recipients: ${recipients.join(", ")}`);
 
-      // Base attachments path
-      const basePath = process.env.ATTACHMENTS_PATH || "./attachments";
+      const driveFolderPath = `dte/${targetYear}/${targetMonth}/compras`;
+      
+      logToFile(`Listing files in Drive folder: ${driveFolderPath}`);
+      const driveFiles = await listFilesInDrivePath(driveFolderPath);
 
-      // Paths for compras and ventas
-      const comprasPath = path.join(basePath, targetYear, targetMonth, "compras");
-      const ventasPath = path.join(basePath, targetYear, targetMonth, "ventas");
-
-      // Check if compras folder exists (it's the main one)
-      if (!fs.existsSync(comprasPath)) {
+      if (!driveFiles || driveFiles.length === 0) {
         return res.status(404).json({
           success: false,
-          error: `No 'compras' folder found for ${targetYear}-${targetMonth}`,
-          path: comprasPath,
+          error: `No files found in Google Drive for ${targetYear}-${targetMonth} at ${driveFolderPath}`,
         });
       }
 
-      // Helper to valid PDF files
-      const getPdfFiles = (dir: string) => {
-        if (!fs.existsSync(dir)) return [];
-        return fs.readdirSync(dir)
-          .filter(file => file.toLowerCase().endsWith(".pdf"))
-          .map(filename => path.join(dir, filename));
-      }
+      const jsonDriveFiles = driveFiles.filter(f => f.name?.toLowerCase().endsWith(".json") || f.mimeType === "application/json");
+      const pdfDriveFiles = driveFiles.filter(f => f.name?.toLowerCase().endsWith(".pdf") || f.mimeType === "application/pdf");
 
-      // Get PDF files from both folders
-      const comprasPdfs = getPdfFiles(comprasPath);
-      const ventasPdfs = getPdfFiles(ventasPath);
-      const allPdfFiles = [...comprasPdfs, ...ventasPdfs];
-
-      // Get JSON files ONLY from compras for CSV
-      const jsonFiles = fs
-        .readdirSync(comprasPath)
-        .filter((file) => file.toLowerCase().endsWith(".json"))
-        .map((filename) => path.join(comprasPath, filename));
-
-      if (allPdfFiles.length === 0) {
+      if (pdfDriveFiles.length === 0) {
         return res.status(404).json({
           success: false,
-          error: "No PDF files found to send (checked compras and ventas)",
-          path: `${comprasPath} & ${ventasPath}`,
+          error: "No PDF files found to send in Drive",
         });
       }
 
-      logToFile(
-        `Found ${jsonFiles.length} JSON files (compras), ${comprasPdfs.length} PDF files (compras) and ${ventasPdfs.length} PDF files (ventas)`
-      );
+      logToFile(`Found ${jsonDriveFiles.length} JSON files and ${pdfDriveFiles.length} PDF files in Drive.`);
 
-      // Process JSON files to generate CSV
-      const jsonValues = [];
-      // Get NRC from environment variable with fallback to default
       const targetNrc = process.env.RECEPTOR_NRC || "2594881";
+      const jsonValues = [];
+      const buffersToAttach: BufferAttachment[] = [];
 
-      for (const jsonFile of jsonFiles) {
+      // Process JSON files
+      for (const file of jsonDriveFiles) {
         try {
-          const jsonContent = fs.readFileSync(jsonFile, "utf8");
+          const buffer = await downloadDriveFileToBuffer(file.id);
+          if (!buffer) continue;
+
+          const jsonContent = buffer.toString("utf8");
           const jsonData = JSON.parse(jsonContent);
 
-          // Check if receptor.nrc matches criteria
           if (jsonData?.receptor?.nrc === targetNrc) {
             jsonValues.push({
               Column1: formatDate(jsonData.identificacion?.fecEmi) || "",
               Column2: 1,
               Column3: 3,
-              Column4:
-                jsonData.identificacion?.codigoGeneracion?.replace(/-/g, "") ||
-                "",
+              Column4: jsonData.identificacion?.codigoGeneracion?.replace(/-/g, "") || "",
               Column5: jsonData.emisor?.nrc || "",
               Column6: jsonData.emisor?.nombre || "",
               Column7: jsonData.resumen?.totalExenta || "",
@@ -161,81 +104,64 @@ export function setEmailAttachmentsRoutes(app: Express) {
             });
           }
         } catch (error) {
-          console.error(`Error processing JSON file ${jsonFile}:`, error);
+          console.error(`Error processing Drive JSON file ${file.name}:`, error);
         }
       }
 
-      // Generate the CSV file
+      // Generate CSV file buffer
       const csvParser = new Parser({
-        fields: [
-          "Column1",
-          "Column2",
-          "Column3",
-          "Column4",
-          "Column5",
-          "Column6",
-          "Column7",
-          "Column8",
-          "Column9",
-          "Column10",
-          "Column11",
-          "Column12",
-          "Column13",
-          "Column14",
-          "Column15",
-          "Column16",
-          "Column17",
-          "Column18",
-          "Column19",
-          "Column20",
-          "Column21",
-        ],
+        fields: ["Column1", "Column2", "Column3", "Column4", "Column5", "Column6", "Column7", "Column8", "Column9", "Column10", "Column11", "Column12", "Column13", "Column14", "Column15", "Column16", "Column17", "Column18", "Column19", "Column20", "Column21"],
       });
 
-      const csv = csvParser.parse(jsonValues);
-
-      // Determine file name based on target month
+      const csvContent = csvParser.parse(jsonValues);
+      
       const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-      const monthName = monthNames[parseInt(targetMonth) - 1]; // targetMonth is 1-based string
-
+      const monthName = monthNames[parseInt(targetMonth) - 1];
       const csvFileName = `COMPRAS-${monthName.toUpperCase()}-${targetYear}.csv`;
 
-      // Save CSV in compras path
-      const csvFilePath = path.join(comprasPath, csvFileName);
-      fs.writeFileSync(csvFilePath, csv);
+      // Add CSV buffer to attachments
+      buffersToAttach.push({
+        filename: csvFileName,
+        content: Buffer.from(csvContent, "utf-8"),
+      });
 
-      // Files to send (All PDFs and CSV)
-      const filesToSend = [...allPdfFiles, csvFilePath];
+      // Download PDFs as buffers and add to attachments
+      for (const file of pdfDriveFiles) {
+        const buffer = await downloadDriveFileToBuffer(file.id);
+        if (buffer) {
+          buffersToAttach.push({
+            filename: file.name,
+            content: buffer,
+          });
+        }
+      }
 
-      // Send email using recipients from environment variable
-      const result = await sendFilesViaEmail(
+      // Send email using buffers
+      const result = await sendBuffersViaEmail(
         recipients,
-        filesToSend,
+        buffersToAttach,
         subject || `${targetYear}-${targetMonth}: CCF de Víctor M. Reyes`,
-        message ||
-        `Adjunto envío los Comprobantes de Crédito Fiscal correspondientes al mes de ${monthName}.`
+        message || `Adjunto envío los Comprobantes de Crédito Fiscal correspondientes al mes de ${monthName}.`
       );
 
       if (result.success) {
-        // Delete JSON files after successful email
-        for (const jsonFile of jsonFiles) {
+        // Delete JSON files from Drive after successful email
+        const deletedJsonFiles = [];
+        for (const file of jsonDriveFiles) {
           try {
-            fs.unlinkSync(jsonFile);
-            logToFile(`Deleted JSON file: ${jsonFile}`);
+            await deleteDriveFile(file.id);
+            deletedJsonFiles.push(file.name);
+            logToFile(`Deleted JSON file from Drive: ${file.name}`);
           } catch (error) {
-            logToFile(
-              `Error deleting JSON file ${jsonFile}: ${error}`,
-              "error"
-            );
+            logToFile(`Error deleting Drive JSON file ${file.name}: ${error}`, "error");
           }
         }
 
         res.status(200).json({
           success: true,
-          message: `Sent ${filesToSend.length
-            } files via email to ${recipients.join(", ")}`,
-          sentFiles: filesToSend.map((f) => path.basename(f)),
-          deletedJsonFiles: jsonFiles.map((f) => path.basename(f)),
+          message: `Sent ${buffersToAttach.length} files via email to ${recipients.join(", ")}`,
+          sentFiles: buffersToAttach.map(f => f.filename),
+          deletedJsonFiles,
           result,
         });
       } else {
@@ -248,15 +174,12 @@ export function setEmailAttachmentsRoutes(app: Express) {
       logToFile(`Error in /api/attachments/dte/email: ${error}`, "error");
       res.status(500).json({
         success: false,
-        error: "Failed to send files via email",
+        error: "Failed to process and send files via Drive",
       });
     }
   }) as RequestHandler);
 }
 
-/**
- * Format date as DD/MM/YYYY
- */
 const formatDate = (dateString: string): string => {
   if (!dateString) return "";
   const date = new Date(dateString);

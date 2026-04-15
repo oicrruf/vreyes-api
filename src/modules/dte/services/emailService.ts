@@ -1,6 +1,4 @@
 import nodemailer from "nodemailer";
-import fs from "fs";
-import path from "path";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -12,20 +10,22 @@ export interface EmailResponse {
   messageId?: string;
 }
 
+export interface BufferAttachment {
+  filename: string;
+  content: Buffer;
+}
+
 /**
- * Send files via email
+ * Send buffers via email
  */
-export const sendFilesViaEmail = async (
-  to: string | string[], // Accept a single email or an array of emails
-  filePaths: string[],
+export const sendBuffersViaEmail = async (
+  to: string | string[],
+  buffers: BufferAttachment[],
   subject: string = `${getPreviousMonthName()}: CCF Víctor M. Reyes`,
   text: string = `Adjunto envío los Comprobantes de Crédito Fiscal correspondientes al mes de ${getPreviousMonthName()}.`
 ): Promise<EmailResponse> => {
   try {
-    // Ensure `to` is a comma-separated string if it's an array
     const recipients = Array.isArray(to) ? to.join(",") : to;
-
-    // Create transporter using Gmail credentials
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -34,41 +34,26 @@ export const sendFilesViaEmail = async (
       },
     });
 
-    // Validate files
-    const validFilePaths = filePaths.filter((filePath) =>
-      fs.existsSync(filePath)
-    );
-
-    if (validFilePaths.length === 0) {
-      return {
-        success: false,
-        error: "No valid files found to attach",
-      };
+    if (!buffers || buffers.length === 0) {
+      return { success: false, error: "No buffer files provided to attach" };
     }
 
-    // Prepare attachments
-    const attachments = validFilePaths.map((filePath) => ({
-      filename: path.basename(filePath),
-      path: filePath,
-    }));
-
-    // Send email
     const info = await transporter.sendMail({
       from: process.env.GMAIL_USER,
-      to: recipients, // Use the recipients string
-      cc: process.env.GMAIL_USER, // Add CC to GMAIL_USER
+      to: recipients,
+      cc: process.env.GMAIL_USER,
       subject,
       text,
-      attachments,
+      attachments: buffers,
     });
 
     return {
       success: true,
-      message: "Email sent successfully",
+      message: "Email sent successfully with buffers",
       messageId: info.messageId,
     };
   } catch (error) {
-    console.error("Error sending email:", error);
+    console.error("Error sending email with buffers:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

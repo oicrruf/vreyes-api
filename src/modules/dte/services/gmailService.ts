@@ -173,6 +173,7 @@ export const listCurrentMonthEmails = (
             });
           }
 
+          const messagePromises: Promise<void>[] = [];
           const fetch = imap.fetch(results, {
             bodies: ["HEADER.FIELDS (FROM TO SUBJECT DATE)", ""],
             struct: true,
@@ -188,47 +189,46 @@ export const listCurrentMonthEmails = (
               attachments: [],
             };
 
-            msg.on("body", (stream: any, info: any) => {
-              if (info.which === "HEADER.FIELDS (FROM TO SUBJECT DATE)") {
-                let buffer = "";
+            const parsePromise = new Promise<void>((resolveMsg) => {
+              msg.on("body", (stream: any, info: any) => {
+                if (info.which === "HEADER.FIELDS (FROM TO SUBJECT DATE)") {
+                  let buffer = "";
+                  stream.on("data", (chunk: any) => {
+                    buffer += chunk.toString("utf8");
+                  });
+                  stream.on("end", () => {
+                    const header = Imap.parseHeader(buffer);
+                    emailData.from = header.from ? header.from[0] : "Unknown";
+                    emailData.subject = header.subject ? header.subject[0] : "No Subject";
+                    emailData.date = header.date ? header.date[0] : "Unknown Date";
+                  });
+                } else {
+                  // Wait for the full message parsing
+                  simpleParser(stream, {}, (err, parsed) => {
+                    if (!err && parsed) {
+                      emailData.body = parsed.text || parsed.html || "";
+                      if (parsed.attachments && parsed.attachments.length > 0) {
+                        emailData.attachments = parsed.attachments;
+                      }
+                    }
+                    resolveMsg(); // Mark message parsing as complete
+                  });
+                }
+              });
 
-                stream.on("data", (chunk: any) => {
-                  buffer += chunk.toString("utf8");
-                });
+              msg.once("attributes", (attrs: any) => {
+                emailData.uid = attrs.uid;
+              });
 
-                stream.on("end", () => {
-                  const header = Imap.parseHeader(buffer);
-                  emailData.from = header.from ? header.from[0] : "Unknown";
-                  emailData.subject = header.subject
-                    ? header.subject[0]
-                    : "No Subject";
-                  emailData.date = header.date
-                    ? header.date[0]
-                    : "Unknown Date";
-                });
-              } else {
-                // This is the full message including body and attachments
-                const streamAny = stream as any;
-                simpleParser(streamAny, {}, (err, parsed) => {
-                  if (err) return;
-
-                  emailData.body = parsed.text || parsed.html || "";
-
-                  if (parsed.attachments && parsed.attachments.length > 0) {
-                    emailData.attachments = parsed.attachments;
-                  }
-                });
-              }
+              msg.once("end", () => {
+                emails.push(extractNrcFromEmail(emailData));
+                // We resolve in simpleParser callback for the full body, 
+                // but if there's no body for some reason, ensure we resolve here too
+                // Actually, simpleParser is the source of truth for body/attachments
+              });
             });
 
-            msg.once("attributes", (attrs: any) => {
-              emailData.uid = attrs.uid;
-            });
-
-            msg.once("end", () => {
-              // Extract NRC info if present
-              emails.push(extractNrcFromEmail(emailData));
-            });
+            messagePromises.push(parsePromise);
           });
 
           fetch.once("error", (err: Error) => {
@@ -236,8 +236,10 @@ export const listCurrentMonthEmails = (
             reject({ success: false, error: "Error fetching emails" });
           });
 
-          fetch.once("end", () => {
+          fetch.once("end", async () => {
             imap.end();
+            // IMPORTANT: Wait for all messages to finish parsing before resolving
+            await Promise.all(messagePromises);
             resolve({ success: true, data: emails });
           });
         });

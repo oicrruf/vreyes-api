@@ -4,16 +4,16 @@ import {
   EmailResponse,
 } from "../services/gmailService";
 import {
-  saveAttachment,
   isJsonAttachment,
   parseJsonAttachment,
 } from "../utils/fileUtils";
 import { logToFile } from "../utils/logUtils";
+import { uploadBufferToDrive } from "../services/driveService";
 
 export function setCurrentMonthEmailRoutes(app: Express) {
   /**
    * @swagger
-   * /api/emails/current-month:
+   * /api/dte:
    *   post:
    *     summary: Obtiene correos del mes especificado y descarga adjuntos (DTE).
    *     tags: [Emails]
@@ -37,7 +37,7 @@ export function setCurrentMonthEmailRoutes(app: Express) {
    *         description: Error interno o de configuración (RECEPTOR_NRC faltante).
    */
   // Endpoint to get emails from the current month
-  app.post("/api/emails/current-month", (async (req, res) => {
+  app.post("/api/dte", (async (req, res) => {
     try {
       const year = req.query.year ? parseInt(req.query.year as string) : undefined;
       const month = req.query.month ? parseInt(req.query.month as string) : undefined;
@@ -68,6 +68,11 @@ export function setCurrentMonthEmailRoutes(app: Express) {
           json?: string;
         }> = [];
 
+        const now = new Date();
+        const yearStr = (year || now.getFullYear()).toString();
+        const monthStr = (month || now.getMonth() + 1).toString().padStart(2, "0");
+        const driveFolderPath = `dte/${yearStr}/${monthStr}/compras`;
+
         // Get NRC from environment variable without fallback
         const targetNrc = process.env.RECEPTOR_NRC;
 
@@ -83,83 +88,77 @@ export function setCurrentMonthEmailRoutes(app: Express) {
           });
         }
 
-        filteredEmails.forEach((email) => {
+        // Use for...of loop instead of forEach to handle async/await
+        for (const email of filteredEmails) {
           if (email.attachments && email.attachments.length > 0) {
             let shouldDownloadAttachments = false;
-            let jsonAttachment = null;
+            let jsonAttachment: any = null;
 
             // First, check if any JSON attachment meets the criteria
-            email.attachments.forEach((attachment) => {
+            email.attachments.forEach((attachment: any) => {
               if (isJsonAttachment(attachment)) {
                 logToFile(`Found JSON attachment in email: ${email.subject}`);
                 const jsonData = parseJsonAttachment(attachment);
                 if (jsonData?.receptor?.nrc === targetNrc) {
-                  logToFile(
-                    `JSON matches criteria: receptor.nrc = ${jsonData.receptor.nrc}`
-                  );
+                  logToFile(`JSON matches criteria: receptor.nrc = ${jsonData.receptor.nrc}`);
                   shouldDownloadAttachments = true;
                   jsonAttachment = attachment;
                 }
               }
             });
 
-            // If criteria is met, download both JSON and PDF attachments
+            // If criteria is met, upload both JSON and PDF attachments to Drive
             if (shouldDownloadAttachments && jsonAttachment) {
-              // Use email.uid instead of generating a unique ID
               const uniqueEmailId = email.uid;
+              let jsonFilename = jsonAttachment.filename || `data_${uniqueEmailId}.json`;
 
-              // Save the JSON attachment directly to the month directory
-              logToFile(`Saving JSON attachment from email: ${email.subject}`);
-              // Pass year and month to saveAttachment
-              const savedJsonPath = saveAttachment(jsonAttachment, undefined, year, month);
-              let jsonFilename: string | undefined = undefined;
-
-              if (savedJsonPath) {
-                logToFile(`JSON attachment saved to: ${savedJsonPath}`);
-                // Extract just the filename from the path
-                jsonFilename = savedJsonPath.split("/").pop() || savedJsonPath;
+              logToFile(`Uploading JSON attachment from email: ${email.subject} to Drive`);
+              try {
+                const driveId = await uploadBufferToDrive(
+                  jsonFilename, 
+                  jsonAttachment.content, 
+                  jsonAttachment.contentType || "application/json", 
+                  driveFolderPath
+                );
+                if (driveId) logToFile(`Uploaded JSON to Drive: ${driveId}`);
+              } catch (e) {
+                logToFile(`Failed to upload JSON: ${e}`, "error");
               }
 
-              // Array to collect PDF filenames
               const pdfFilenames: string[] = [];
 
-              // Save any PDF attachments from the same email
-              email.attachments.forEach((attachment) => {
+              for (const attachment of email.attachments) {
                 if (attachment.filename?.toLowerCase().endsWith(".pdf")) {
-                  logToFile(`Saving PDF attachment: ${attachment.filename}`);
-                  // Pass year and month to saveAttachment
-                  const savedPath = saveAttachment(attachment, undefined, year, month);
-                  if (savedPath) {
-                    logToFile(`PDF attachment saved to: ${savedPath}`);
-                    // Extract just the filename from the path
-                    const pdfFilename = savedPath.split("/").pop() || savedPath;
-                    pdfFilenames.push(pdfFilename);
+                  const pdfFilename = attachment.filename;
+                  logToFile(`Uploading PDF attachment: ${pdfFilename} to Drive`);
+                  pdfFilenames.push(pdfFilename);
+
+                  try {
+                    const driveId = await uploadBufferToDrive(
+                      pdfFilename, 
+                      attachment.content, 
+                      "application/pdf", 
+                      driveFolderPath
+                    );
+                    if (driveId) logToFile(`Uploaded PDF to Drive: ${driveId}`);
+                  } catch (e) {
+                    logToFile(`Failed to upload PDF: ${e}`, "error");
                   }
                 }
-              });
+              }
 
-              // If we have a JSON file, create entries for each PDF or just one entry with the JSON
               if (jsonFilename) {
                 if (pdfFilenames.length > 0) {
-                  // Create an entry for each PDF file paired with the JSON
                   pdfFilenames.forEach((pdfFilename) => {
-                    downloadedFiles.push({
-                      id: uniqueEmailId,
-                      json: jsonFilename,
-                      pdf: pdfFilename,
-                    });
+                    downloadedFiles.push({ id: uniqueEmailId, json: jsonFilename, pdf: pdfFilename });
                   });
                 } else {
-                  // Create an entry with just the JSON
-                  downloadedFiles.push({
-                    id: uniqueEmailId,
-                    json: jsonFilename,
-                  });
+                  downloadedFiles.push({ id: uniqueEmailId, json: jsonFilename });
                 }
               }
             }
           }
-        });
+        }
 
         // Send only a simple success message in the response
         res.status(200).json({
