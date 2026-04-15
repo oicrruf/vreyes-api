@@ -28,3 +28,34 @@ model Dte {
 
   @@map("dte")
 }
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  name          String?
+  avatarUrl     String?        @map("avatar_url")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  identities    UserIdentity[]
+
+  @@map("users")
+}
+
+enum IdentityProvider {
+  google
+  local
+  keycloak
+}
+
+model UserIdentity {
+  id                String           @id @default(uuid())
+  userId            String           @map("user_id")
+  provider          IdentityProvider
+  providerId        String           @map("provider_id")
+  passwordHash      String?          @map("password_hash")
+  lastLogin         DateTime?        @map("last_login")
+  user              User             @relation(fields: [userId], references: id, onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@map("user_identities")
+}
