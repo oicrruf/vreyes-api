@@ -13,7 +13,8 @@ RUN npm install
 COPY . .
 
 # Generar cliente Prisma y build de TypeScript
-RUN npx prisma generate && npm run build
+# SUPABASE_DATABASE_URI es requerido por prisma.config.ts pero no se usa en generate
+RUN SUPABASE_DATABASE_URI=postgresql://dummy:dummy@localhost/dummy npx prisma generate && npm run build
 
 # Stage 2: Production
 FROM node:20-alpine
