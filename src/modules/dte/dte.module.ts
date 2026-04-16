@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
+import { AuthModule } from '../auth/auth.module';
 
 import { EMAIL_READER } from './domain/ports/email-reader.port';
 import { FILE_STORAGE } from './domain/ports/file-storage.port';
@@ -14,13 +15,14 @@ import { PrismaDteAdapter } from './infrastructure/adapters/prisma-dte.adapter';
 import { FetchDteEmailsHandler } from './application/commands/fetch-dte-emails/fetch-dte-emails.handler';
 import { SendDteAttachmentsHandler } from './application/commands/send-dte-attachments/send-dte-attachments.handler';
 import { GetDteFilesHandler } from './application/queries/get-dte-files/get-dte-files.handler';
+import { GetDteDetailHandler } from './application/queries/get-dte-detail/get-dte-detail.handler';
 
 import { DteController } from './infrastructure/http/dte.controller';
 import { DteScheduler } from './infrastructure/scheduled/dte.scheduler';
 import { LogService } from '../../shared/logging/log.service';
 
 @Module({
-  imports: [CqrsModule],
+  imports: [CqrsModule, AuthModule],
   controllers: [DteController],
   providers: [
     // Ports → Adapters
@@ -33,6 +35,7 @@ import { LogService } from '../../shared/logging/log.service';
     FetchDteEmailsHandler,
     SendDteAttachmentsHandler,
     GetDteFilesHandler,
+    GetDteDetailHandler,
 
     // Scheduler
     DteScheduler,

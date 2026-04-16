@@ -1,6 +1,5 @@
+import 'dotenv/config';
 import 'reflect-metadata';
-import { config } from 'dotenv';
-config();
 
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -9,8 +8,14 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'https://saas.vreyes.dev',
+    ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
+  ];
+
   app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:9000',
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
@@ -19,9 +24,9 @@ async function bootstrap() {
     .setTitle('Auto Task API Documentation')
     .setDescription('API de DTE (Documento Tributario Electrónico) y automatización de tareas.')
     .setVersion('2.0')
-    .addServer('http://localhost:3001', 'Servidor local')
+    .addServer('http://localhost:9000', 'Servidor local')
     .addServer('https://api.vreyes.dev', 'Servidor api.vreyes.dev')
-    .addApiKey({ type: 'apiKey', name: 'x-api-key', in: 'header' }, 'api-key')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
@@ -29,9 +34,8 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
-  const port = process.env.PORT ?? 3001;
+  const port = process.env.PORT ?? 9000;
   await app.listen(port);
-  console.log(`Server is running on http://localhost:${port}`);
 }
 
 bootstrap();

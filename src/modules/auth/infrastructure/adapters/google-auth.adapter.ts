@@ -7,9 +7,9 @@ export class GoogleAuthAdapter implements GoogleAuthService {
   private client: OAuth2Client;
 
   constructor() {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientId = process.env.GOOGLE_AUTH_CLIENT_ID;
     if (!clientId) {
-      throw new Error('GOOGLE_CLIENT_ID not found in environment variables');
+      throw new Error('GOOGLE_AUTH_CLIENT_ID not found in environment variables');
     }
     this.client = new OAuth2Client(clientId);
   }
@@ -18,7 +18,7 @@ export class GoogleAuthAdapter implements GoogleAuthService {
     try {
       const ticket = await this.client.verifyIdToken({
         idToken: token,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: process.env.GOOGLE_AUTH_CLIENT_ID,
       });
 
       const payload = ticket.getPayload();

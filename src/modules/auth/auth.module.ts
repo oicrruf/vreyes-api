@@ -32,6 +32,6 @@ import { CqrsModule } from '@nestjs/cqrs';
     JwtStrategy,
     LoginWithGoogleHandler,
   ],
-  exports: [USER_REPOSITORY],
+  exports: [USER_REPOSITORY, PassportModule, JwtStrategy],
 })
 export class AuthModule {}

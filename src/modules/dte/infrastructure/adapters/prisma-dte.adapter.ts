@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DteType as PrismaDteType } from '@prisma/client';
 import { PrismaService } from '../../../../shared/database/prisma.service';
-import { DteRepository, DteType } from '../../domain/ports/dte-repository.port';
+import { DteRepository, DteRecord, DteType } from '../../domain/ports/dte-repository.port';
 import { DteDocument } from '../../domain/entities/dte-document.entity';
 
 @Injectable()
@@ -16,6 +16,7 @@ export class PrismaDteAdapter implements DteRepository {
         type: this.toPrismaType(type),
         issueDate: dte.fechaEmision,
         receiverNrc: dte.receptorNrc,
+        receiverName: dte.receptorNombre,
         issuerNrc: dte.emisorNrc,
         issuerName: dte.emisorNombre,
         exemptTotal: dte.totalExenta,
@@ -40,6 +41,7 @@ export class PrismaDteAdapter implements DteRepository {
       record.generationCode,
       record.issueDate,
       record.receiverNrc,
+      record.receiverName,
       record.issuerNrc,
       record.issuerName,
       record.exemptTotal,
@@ -59,6 +61,7 @@ export class PrismaDteAdapter implements DteRepository {
           r.generationCode,
           r.issueDate,
           r.receiverNrc,
+          r.receiverName,
           r.issuerNrc,
           r.issuerName,
           r.exemptTotal,
@@ -67,6 +70,44 @@ export class PrismaDteAdapter implements DteRepository {
           r.taxValue,
         ),
     );
+  }
+
+  async findByPeriod(year: number, month: number, type: DteType): Promise<DteRecord[]> {
+    const monthStr = month.toString().padStart(2, '0');
+    const prefix = `${year}-${monthStr}`;
+
+    const records = await this.prisma.dte.findMany({
+      where: {
+        type: this.toPrismaType(type),
+        issueDate: { startsWith: prefix },
+      },
+      orderBy: { issueDate: 'asc' },
+    });
+
+    return records.map((r) => ({
+      generationCode: r.generationCode,
+      type,
+      issueDate: r.issueDate,
+      receiverNrc: r.receiverNrc,
+      receiverName: r.receiverName,
+      issuerNrc: r.issuerNrc,
+      issuerName: r.issuerName,
+      exemptTotal: r.exemptTotal,
+      taxableTotal: r.taxableTotal,
+      amountDue: r.amountDue,
+      taxValue: r.taxValue,
+      pdfUrl: r.pdfUrl,
+      createdAt: r.createdAt,
+    }));
+  }
+
+  async findRawJson(generationCode: string): Promise<object | null> {
+    const record = await this.prisma.dte.findUnique({
+      where: { generationCode },
+      select: { rawJson: true },
+    });
+    if (!record) return null;
+    return record.rawJson as object;
   }
 
   private toPrismaType(type: DteType): PrismaDteType {

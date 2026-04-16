@@ -16,6 +16,7 @@ model Dte {
   type           DteType
   issueDate      String   @map("issue_date")
   receiverNrc    String   @map("receiver_nrc")
+  receiverName   String   @default("") @map("receiver_name")
   issuerNrc      String   @map("issuer_nrc")
   issuerName     String   @map("issuer_name")
   exemptTotal    Float    @map("exempt_total")

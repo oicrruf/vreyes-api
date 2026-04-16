@@ -14,17 +14,18 @@ import {
   HttpException,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { ApiTags, ApiSecurity, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { ApiKeyGuard } from '../../../../shared/guards/api-key.guard';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../../../shared/guards/jwt-auth.guard';
 import { FetchDteEmailsCommand } from '../../application/commands/fetch-dte-emails/fetch-dte-emails.command';
 import { SendDteAttachmentsCommand } from '../../application/commands/send-dte-attachments/send-dte-attachments.command';
 import { GetDteFilesQuery } from '../../application/queries/get-dte-files/get-dte-files.query';
+import { GetDteDetailQuery } from '../../application/queries/get-dte-detail/get-dte-detail.query';
 import { FetchDteDto } from './dto/fetch-dte.dto';
 import { SendDteAttachmentsDto } from './dto/send-dte-attachments.dto';
 
 @ApiTags('DTE')
-@ApiSecurity('api-key')
-@UseGuards(ApiKeyGuard)
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api')
 export class DteController {
   constructor(
@@ -73,30 +74,45 @@ export class DteController {
   }
 
   @Get('dte/:year/:month/:type')
-  @ApiOperation({ summary: 'Lista los archivos DTE por año, mes y tipo (compras/ventas).' })
-  @ApiResponse({ status: 200, description: 'Lista de archivos recuperada con éxito.' })
+  @ApiOperation({ summary: 'Consulta DTEs en base de datos por año, mes y tipo.' })
+  @ApiParam({ name: 'year', type: Number, example: 2026 })
+  @ApiParam({ name: 'month', type: Number, example: 4 })
+  @ApiParam({ name: 'type', enum: ['purchase', 'sale'], description: 'purchase = compras, sale = ventas' })
+  @ApiResponse({ status: 200, description: 'Registros recuperados con éxito.' })
   @ApiResponse({ status: 400, description: 'Parámetros inválidos.' })
-  @ApiResponse({ status: 404, description: 'El directorio solicitado no existe.' })
   async getDteFiles(
     @Param('year') year: string,
     @Param('month') month: string,
     @Param('type') type: string,
   ) {
-    if (type !== 'compras' && type !== 'ventas') {
-      throw new BadRequestException("El parámetro 'type' debe ser 'compras' o 'ventas'.");
+    if (type !== 'purchase' && type !== 'sale') {
+      throw new BadRequestException("El parámetro 'type' debe ser 'purchase' o 'sale'.");
+    }
+
+    const yearNum = Number(year);
+    const monthNum = Number(month);
+
+    if (isNaN(yearNum) || isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
+      throw new BadRequestException('Año o mes inválido.');
     }
 
     try {
       const result = await this.queryBus.execute(
-        new GetDteFilesQuery(year, month, type as 'compras' | 'ventas'),
+        new GetDteFilesQuery(yearNum, monthNum, type as 'purchase' | 'sale'),
       );
       return { success: true, ...result };
     } catch (err: any) {
-      if (err.message?.includes('No files found')) {
-        throw new NotFoundException(err.message);
-      }
-      throw new InternalServerErrorException('Error interno al listar archivos.');
+      throw new InternalServerErrorException('Error interno al consultar registros.');
     }
+  }
+
+  @Get('dte/:generationCode/detail')
+  @ApiOperation({ summary: 'Retorna el JSON crudo del DTE (cuerpoDocumento y estructura completa).' })
+  @ApiParam({ name: 'generationCode', description: 'Código de generación del DTE' })
+  @ApiResponse({ status: 200, description: 'JSON crudo del DTE.' })
+  @ApiResponse({ status: 404, description: 'DTE no encontrado.' })
+  async getDteDetail(@Param('generationCode') generationCode: string) {
+    return this.queryBus.execute(new GetDteDetailQuery(generationCode));
   }
 
   @Post('attachments/dte/email')

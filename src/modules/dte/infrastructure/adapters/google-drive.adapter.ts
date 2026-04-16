@@ -8,9 +8,9 @@ import { FileStoragePort, FileInfo } from '../../domain/ports/file-storage.port'
 @Injectable()
 export class GoogleDriveAdapter implements FileStoragePort {
   private getDriveClient() {
-    const oauthClientId = process.env.GOOGLE_CLIENT_ID;
-    const oauthClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const oauthRefreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+    const oauthClientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
+    const oauthClientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+    const oauthRefreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
 
     if (oauthClientId && oauthClientSecret && oauthRefreshToken) {
       const oauth2Client = new google.auth.OAuth2(oauthClientId, oauthClientSecret);

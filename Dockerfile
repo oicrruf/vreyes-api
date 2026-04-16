@@ -34,4 +34,4 @@ RUN mkdir -p attachments logs
 EXPOSE 3001
 
 # Comando para arrancar en producción
-CMD [ "node", "dist/app.js" ]
+CMD [ "node", "dist/main.js" ]
