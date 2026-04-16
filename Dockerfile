@@ -12,8 +12,8 @@ RUN npm install
 # Copiar el resto del código
 COPY . .
 
-# Generar el build de TypeScript
-RUN npm run build
+# Generar cliente Prisma y build de TypeScript
+RUN npx prisma generate && npm run build
 
 # Stage 2: Production
 FROM node:20-alpine
@@ -27,11 +27,14 @@ COPY --from=build /usr/src/app/dist ./dist
 # Instalar solo dependencias de producción
 RUN npm install --omit=dev
 
+# Copiar cliente Prisma generado (los enums y tipos no se regeneran sin prisma CLI)
+COPY --from=build /usr/src/app/node_modules/.prisma ./node_modules/.prisma
+
 # Crear directorios para volúmenes opcionalmente (Docker los creará si no existen)
 RUN mkdir -p attachments logs
 
 # Exponer el puerto configurado (el 3001 es el nuevo default)
-EXPOSE 3001
+EXPOSE 9000
 
 # Comando para arrancar en producción
 CMD [ "node", "dist/main.js" ]
