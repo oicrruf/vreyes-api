@@ -32,6 +32,20 @@ export class PrismaDteAdapter implements DteRepository {
     });
   }
 
+  async updateClassification(
+    generationCode: string,
+    issuerActivity: string | null,
+    itemsCategory: string[],
+  ): Promise<void> {
+    await this.prisma.dte.update({
+      where: { generationCode },
+      data: {
+        issuerActivity,
+        itemsCategory,
+      },
+    });
+  }
+
   async findByGenerationCode(code: string): Promise<DteDocument | null> {
     const record = await this.prisma.dte.findUnique({
       where: { generationCode: code },
@@ -97,6 +111,8 @@ export class PrismaDteAdapter implements DteRepository {
       amountDue: r.amountDue,
       taxValue: r.taxValue,
       pdfUrl: r.pdfUrl,
+      issuerActivity: r.issuerActivity,
+      itemsCategory: Array.isArray(r.itemsCategory) ? (r.itemsCategory as string[]) : null,
       createdAt: r.createdAt,
     }));
   }

@@ -17,6 +17,8 @@ export interface DteRecord {
   amountDue: number;
   taxValue: number;
   pdfUrl: string | null;
+  issuerActivity: string | null;
+  itemsCategory: string[] | null;
   createdAt: Date;
 }
 
@@ -26,4 +28,9 @@ export interface DteRepository {
   findAll(type?: DteType): Promise<DteDocument[]>;
   findByPeriod(year: number, month: number, type: DteType): Promise<DteRecord[]>;
   findRawJson(generationCode: string): Promise<object | null>;
+  updateClassification(
+    generationCode: string,
+    issuerActivity: string | null,
+    itemsCategory: string[],
+  ): Promise<void>;
 }

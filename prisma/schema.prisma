@@ -24,6 +24,8 @@ model Dte {
   amountDue      Float    @map("amount_due")
   taxValue       Float    @map("tax_value")
   pdfUrl         String?  @map("pdf_url")
+  issuerActivity String?  @map("issuer_activity")
+  itemsCategory  Json?    @map("items_category")
   rawJson        Json     @map("raw_json")
   createdAt      DateTime @default(now()) @map("created_at")
 

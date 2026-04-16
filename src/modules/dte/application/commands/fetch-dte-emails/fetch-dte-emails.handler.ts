@@ -4,6 +4,7 @@ import { FetchDteEmailsCommand } from './fetch-dte-emails.command';
 import { EmailReaderPort, EMAIL_READER } from '../../../domain/ports/email-reader.port';
 import { FileStoragePort, FILE_STORAGE } from '../../../domain/ports/file-storage.port';
 import { DteRepository, DTE_REPOSITORY } from '../../../domain/ports/dte-repository.port';
+import { LlmClassifierPort, LLM_CLASSIFIER } from '../../../../llm/domain/ports/llm-classifier.port';
 import { DateRange } from '../../../domain/value-objects/date-range.vo';
 import { Nrc } from '../../../domain/value-objects/nrc.vo';
 import { DteDocument } from '../../../domain/entities/dte-document.entity';
@@ -24,6 +25,7 @@ export class FetchDteEmailsHandler
     @Inject(EMAIL_READER) private readonly emailReader: EmailReaderPort,
     @Inject(FILE_STORAGE) private readonly fileStorage: FileStoragePort,
     @Inject(DTE_REPOSITORY) private readonly dteRepository: DteRepository,
+    @Inject(LLM_CLASSIFIER) private readonly llmClassifier: LlmClassifierPort,
     private readonly eventBus: EventBus,
     private readonly logService: LogService,
   ) {}
@@ -119,6 +121,14 @@ export class FetchDteEmailsHandler
       if (dteDoc) {
         await this.dteRepository.save(dteDoc, type, lastPdfUrl, rawJson);
         this.logService.log(`Saved DTE to DB: ${dteDoc.codigoGeneracion}`, 'dte');
+
+        // Classify — non-blocking, errors logged but do not fail the sync
+        await this.classifyDte(dteDoc.codigoGeneracion, rawJson).catch((err) =>
+          this.logService.log(
+            `Classification failed for ${dteDoc.codigoGeneracion}: ${err.message}`,
+            'dte',
+          ),
+        );
       }
 
       if (pdfFilenames.length > 0) {
@@ -143,6 +153,28 @@ export class FetchDteEmailsHandler
       downloaded: downloadedFiles.length,
       files: downloadedFiles,
     };
+  }
+
+  private async classifyDte(generationCode: string, rawJson: any): Promise<void> {
+    // Extract issuerActivity directly — no LLM needed
+    const issuerActivity: string | null = rawJson?.emisor?.descActividad ?? null;
+
+    // Extract item descriptions from cuerpoDocumento
+    const cuerpo: any[] = Array.isArray(rawJson?.cuerpoDocumento) ? rawJson.cuerpoDocumento : [];
+    const descriptions: string[] = cuerpo
+      .map((item: any) => item?.descripcion)
+      .filter((d): d is string => typeof d === 'string' && d.trim().length > 0);
+
+    let itemsCategory: string[] = [];
+    if (descriptions.length > 0) {
+      itemsCategory = await this.llmClassifier.classifyItems(descriptions);
+    }
+
+    await this.dteRepository.updateClassification(generationCode, issuerActivity, itemsCategory);
+    this.logService.log(
+      `Classified DTE ${generationCode}: activity="${issuerActivity}", ${itemsCategory.length} item categories`,
+      'dte',
+    );
   }
 
   private isJsonAttachment(attachment: any): boolean {
