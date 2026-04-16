@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  // NO url field — Prisma 7 uses prisma.config.ts
 }
 
 enum DteType {
@@ -11,35 +12,61 @@ enum DteType {
   sale
 }
 
+model Activity {
+  codActividad  String     @id @map("cod_actividad")
+  descActividad String     @map("desc_actividad")
+  taxpayers     Taxpayer[]
+
+  @@map("activity")
+}
+
+model Taxpayer {
+  id              String    @id @default(uuid())
+  nrc             String?   @unique
+  nit             String?
+  nombre          String
+  nombreComercial String?   @map("nombre_comercial")
+  codActividad    String?   @map("cod_actividad")
+  rawJson         Json?     @map("raw_json")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  activity     Activity? @relation(fields: [codActividad], references: [codActividad])
+  issuedDtes   Dte[]     @relation("issuer")
+  receivedDtes Dte[]     @relation("receiver")
+
+  @@map("taxpayer")
+}
+
 model Dte {
   generationCode String   @id @map("generation_code")
   type           DteType
   issueDate      String   @map("issue_date")
-  receiverNrc    String   @map("receiver_nrc")
-  receiverName   String   @default("") @map("receiver_name")
+  receiverNrc    String?  @map("receiver_nrc")
   issuerNrc      String   @map("issuer_nrc")
-  issuerName     String   @map("issuer_name")
   exemptTotal    Float    @map("exempt_total")
   taxableTotal   Float    @map("taxable_total")
   amountDue      Float    @map("amount_due")
   taxValue       Float    @map("tax_value")
   pdfUrl         String?  @map("pdf_url")
-  issuerActivity String?  @map("issuer_activity")
   itemsCategory  Json?    @map("items_category")
   rawJson        Json     @map("raw_json")
   createdAt      DateTime @default(now()) @map("created_at")
+
+  issuer   Taxpayer  @relation("issuer",   fields: [issuerNrc],   references: [nrc])
+  receiver Taxpayer? @relation("receiver", fields: [receiverNrc], references: [nrc])
 
   @@map("dte")
 }
 
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  name          String?
-  avatarUrl     String?        @map("avatar_url")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  identities    UserIdentity[]
+  id         String         @id @default(uuid())
+  email      String         @unique
+  name       String?
+  avatarUrl  String?        @map("avatar_url")
+  createdAt  DateTime       @default(now()) @map("created_at")
+  updatedAt  DateTime       @updatedAt @map("updated_at")
+  identities UserIdentity[]
 
   @@map("users")
 }
@@ -51,13 +78,13 @@ enum IdentityProvider {
 }
 
 model UserIdentity {
-  id                String           @id @default(uuid())
-  userId            String           @map("user_id")
-  provider          IdentityProvider
-  providerId        String           @map("provider_id")
-  passwordHash      String?          @map("password_hash")
-  lastLogin         DateTime?        @map("last_login")
-  user              User             @relation(fields: [userId], references: id, onDelete: Cascade)
+  id           String           @id @default(uuid())
+  userId       String           @map("user_id")
+  provider     IdentityProvider
+  providerId   String           @map("provider_id")
+  passwordHash String?          @map("password_hash")
+  lastLogin    DateTime?        @map("last_login")
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerId])
   @@map("user_identities")

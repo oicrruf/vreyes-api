@@ -15,10 +15,8 @@ export class PrismaDteAdapter implements DteRepository {
         generationCode: dte.codigoGeneracion,
         type: this.toPrismaType(type),
         issueDate: dte.fechaEmision,
-        receiverNrc: dte.receptorNrc,
-        receiverName: dte.receptorNombre,
+        receiverNrc: dte.receptorNrc || null,
         issuerNrc: dte.emisorNrc,
-        issuerName: dte.emisorNombre,
         exemptTotal: dte.totalExenta,
         taxableTotal: dte.totalGravada,
         amountDue: dte.totalPagar,
@@ -34,13 +32,11 @@ export class PrismaDteAdapter implements DteRepository {
 
   async updateClassification(
     generationCode: string,
-    issuerActivity: string | null,
     itemsCategory: string[],
   ): Promise<void> {
     await this.prisma.dte.update({
       where: { generationCode },
       data: {
-        issuerActivity,
         itemsCategory,
       },
     });
@@ -49,15 +45,16 @@ export class PrismaDteAdapter implements DteRepository {
   async findByGenerationCode(code: string): Promise<DteDocument | null> {
     const record = await this.prisma.dte.findUnique({
       where: { generationCode: code },
+      include: { issuer: true, receiver: true }
     });
     if (!record) return null;
     return new DteDocument(
       record.generationCode,
       record.issueDate,
-      record.receiverNrc,
-      record.receiverName,
+      record.receiverNrc || '',
+      record.receiver?.nombre || '',
       record.issuerNrc,
-      record.issuerName,
+      record.issuer.nombre,
       record.exemptTotal,
       record.taxableTotal,
       record.amountDue,
@@ -68,16 +65,17 @@ export class PrismaDteAdapter implements DteRepository {
   async findAll(type?: DteType): Promise<DteDocument[]> {
     const records = await this.prisma.dte.findMany({
       where: type ? { type: this.toPrismaType(type) } : undefined,
+      include: { issuer: true, receiver: true }
     });
     return records.map(
       (r) =>
         new DteDocument(
           r.generationCode,
           r.issueDate,
-          r.receiverNrc,
-          r.receiverName,
+          r.receiverNrc || '',
+          r.receiver?.nombre || '',
           r.issuerNrc,
-          r.issuerName,
+          r.issuer.nombre,
           r.exemptTotal,
           r.taxableTotal,
           r.amountDue,
@@ -95,6 +93,12 @@ export class PrismaDteAdapter implements DteRepository {
         type: this.toPrismaType(type),
         issueDate: { startsWith: prefix },
       },
+      include: {
+        issuer: {
+          include: { activity: true },
+        },
+        receiver: true,
+      },
       orderBy: { issueDate: 'asc' },
     });
 
@@ -103,15 +107,15 @@ export class PrismaDteAdapter implements DteRepository {
       type,
       issueDate: r.issueDate,
       receiverNrc: r.receiverNrc,
-      receiverName: r.receiverName,
+      receiverName: r.receiver?.nombre ?? null,
       issuerNrc: r.issuerNrc,
-      issuerName: r.issuerName,
+      issuerName: r.issuer.nombre,
+      issuerActivity: r.issuer.activity?.descActividad ?? null,
       exemptTotal: r.exemptTotal,
       taxableTotal: r.taxableTotal,
       amountDue: r.amountDue,
       taxValue: r.taxValue,
       pdfUrl: r.pdfUrl,
-      issuerActivity: r.issuerActivity,
       itemsCategory: Array.isArray(r.itemsCategory) ? (r.itemsCategory as string[]) : null,
       createdAt: r.createdAt,
     }));

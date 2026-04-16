@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { AuthModule } from '../auth/auth.module';
 import { LlmModule } from '../llm/llm.module';
+import { TaxpayerModule } from '../taxpayer/taxpayer.module';
 
 import { EMAIL_READER } from './domain/ports/email-reader.port';
 import { FILE_STORAGE } from './domain/ports/file-storage.port';
@@ -23,7 +24,7 @@ import { DteScheduler } from './infrastructure/scheduled/dte.scheduler';
 import { LogService } from '../../shared/logging/log.service';
 
 @Module({
-  imports: [CqrsModule, AuthModule, LlmModule],
+  imports: [CqrsModule, AuthModule, LlmModule, TaxpayerModule],
   controllers: [DteController],
   providers: [
     // Ports → Adapters

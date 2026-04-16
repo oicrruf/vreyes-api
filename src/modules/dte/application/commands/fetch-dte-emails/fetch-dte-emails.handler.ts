@@ -4,6 +4,7 @@ import { FetchDteEmailsCommand } from './fetch-dte-emails.command';
 import { EmailReaderPort, EMAIL_READER } from '../../../domain/ports/email-reader.port';
 import { FileStoragePort, FILE_STORAGE } from '../../../domain/ports/file-storage.port';
 import { DteRepository, DTE_REPOSITORY } from '../../../domain/ports/dte-repository.port';
+import { TaxpayerRepository, TAXPAYER_REPOSITORY } from '../../../../../modules/taxpayer/domain/ports/taxpayer-repository.port';
 import { LlmClassifierPort, LLM_CLASSIFIER } from '../../../../llm/domain/ports/llm-classifier.port';
 import { DateRange } from '../../../domain/value-objects/date-range.vo';
 import { Nrc } from '../../../domain/value-objects/nrc.vo';
@@ -25,6 +26,7 @@ export class FetchDteEmailsHandler
     @Inject(EMAIL_READER) private readonly emailReader: EmailReaderPort,
     @Inject(FILE_STORAGE) private readonly fileStorage: FileStoragePort,
     @Inject(DTE_REPOSITORY) private readonly dteRepository: DteRepository,
+    @Inject(TAXPAYER_REPOSITORY) private readonly taxpayerRepository: TaxpayerRepository,
     @Inject(LLM_CLASSIFIER) private readonly llmClassifier: LlmClassifierPort,
     private readonly eventBus: EventBus,
     private readonly logService: LogService,
@@ -81,8 +83,14 @@ export class FetchDteEmailsHandler
         const existing = await this.dteRepository.findByGenerationCode(dteDoc.codigoGeneracion);
         if (existing) {
           this.logService.log(
-            `DTE ${dteDoc.codigoGeneracion} already exists in DB. Skipping...`,
+            `DTE ${dteDoc.codigoGeneracion} already exists in DB. Skipping save, classifying if needed...`,
             'dte',
+          );
+          await this.classifyDte(dteDoc.codigoGeneracion, rawJson).catch((err) =>
+            this.logService.log(
+              `Classification failed for ${dteDoc.codigoGeneracion}: ${err.message}`,
+              'dte',
+            ),
           );
           continue;
         }
@@ -119,6 +127,26 @@ export class FetchDteEmailsHandler
       }
 
       if (dteDoc) {
+        if (rawJson?.emisor?.nrc) {
+          await this.taxpayerRepository.upsert(rawJson.emisor.nrc, {
+            nit: rawJson.emisor.nit,
+            nombre: rawJson.emisor.nombre || '',
+            nombreComercial: rawJson.emisor.nombreComercial,
+            codActividad: rawJson.emisor.codActividad,
+            descActividad: rawJson.emisor.descActividad,
+            rawJson: rawJson.emisor
+          });
+        }
+        if (rawJson?.receptor?.nrc) {
+          await this.taxpayerRepository.upsert(rawJson.receptor.nrc, {
+            nit: rawJson.receptor.nit,
+            nombre: rawJson.receptor.nombre || '',
+            nombreComercial: rawJson.receptor.nombreComercial,
+            codActividad: rawJson.receptor.codActividad,
+            descActividad: rawJson.receptor.descActividad,
+            rawJson: rawJson.receptor
+          });
+        }
         await this.dteRepository.save(dteDoc, type, lastPdfUrl, rawJson);
         this.logService.log(`Saved DTE to DB: ${dteDoc.codigoGeneracion}`, 'dte');
 
@@ -156,9 +184,6 @@ export class FetchDteEmailsHandler
   }
 
   private async classifyDte(generationCode: string, rawJson: any): Promise<void> {
-    // Extract issuerActivity directly — no LLM needed
-    const issuerActivity: string | null = rawJson?.emisor?.descActividad ?? null;
-
     // Extract item descriptions from cuerpoDocumento
     const cuerpo: any[] = Array.isArray(rawJson?.cuerpoDocumento) ? rawJson.cuerpoDocumento : [];
     const descriptions: string[] = cuerpo
@@ -170,9 +195,9 @@ export class FetchDteEmailsHandler
       itemsCategory = await this.llmClassifier.classifyItems(descriptions);
     }
 
-    await this.dteRepository.updateClassification(generationCode, issuerActivity, itemsCategory);
+    await this.dteRepository.updateClassification(generationCode, itemsCategory);
     this.logService.log(
-      `Classified DTE ${generationCode}: activity="${issuerActivity}", ${itemsCategory.length} item categories`,
+      `Classified DTE ${generationCode}: ${itemsCategory.length} item categories`,
       'dte',
     );
   }
