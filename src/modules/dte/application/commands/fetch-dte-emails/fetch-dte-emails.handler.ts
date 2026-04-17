@@ -79,21 +79,27 @@ export class FetchDteEmailsHandler
       const rawJson = this.parseJson(jsonAttachment);
       const dteDoc = rawJson ? DteDocument.fromJson(rawJson) : null;
 
-      if (dteDoc) {
-        const existing = await this.dteRepository.findByGenerationCode(dteDoc.codigoGeneracion);
-        if (existing) {
+      if (!dteDoc) {
+        this.logService.log(
+          `Could not parse DTE document from email: ${email.subject}. Skipping upload.`,
+          'dte',
+        );
+        continue;
+      }
+
+      const existing = await this.dteRepository.findByGenerationCode(dteDoc.codigoGeneracion);
+      if (existing) {
+        this.logService.log(
+          `DTE ${dteDoc.codigoGeneracion} already exists in DB. Skipping save, classifying if needed...`,
+          'dte',
+        );
+        await this.classifyDte(dteDoc.codigoGeneracion, rawJson).catch((err) =>
           this.logService.log(
-            `DTE ${dteDoc.codigoGeneracion} already exists in DB. Skipping save, classifying if needed...`,
+            `Classification failed for ${dteDoc.codigoGeneracion}: ${err.message}`,
             'dte',
-          );
-          await this.classifyDte(dteDoc.codigoGeneracion, rawJson).catch((err) =>
-            this.logService.log(
-              `Classification failed for ${dteDoc.codigoGeneracion}: ${err.message}`,
-              'dte',
-            ),
-          );
-          continue;
-        }
+          ),
+        );
+        continue;
       }
 
       const jsonFilename = jsonAttachment.filename || `data_${email.uid}.json`;
@@ -126,38 +132,36 @@ export class FetchDteEmailsHandler
         }
       }
 
-      if (dteDoc) {
-        if (rawJson?.emisor?.nrc) {
-          await this.taxpayerRepository.upsert(rawJson.emisor.nrc, {
-            nit: rawJson.emisor.nit,
-            nombre: rawJson.emisor.nombre || '',
-            nombreComercial: rawJson.emisor.nombreComercial,
-            codActividad: rawJson.emisor.codActividad,
-            descActividad: rawJson.emisor.descActividad,
-            rawJson: rawJson.emisor
-          });
-        }
-        if (rawJson?.receptor?.nrc) {
-          await this.taxpayerRepository.upsert(rawJson.receptor.nrc, {
-            nit: rawJson.receptor.nit,
-            nombre: rawJson.receptor.nombre || '',
-            nombreComercial: rawJson.receptor.nombreComercial,
-            codActividad: rawJson.receptor.codActividad,
-            descActividad: rawJson.receptor.descActividad,
-            rawJson: rawJson.receptor
-          });
-        }
-        await this.dteRepository.save(dteDoc, type, lastPdfUrl, rawJson);
-        this.logService.log(`Saved DTE to DB: ${dteDoc.codigoGeneracion}`, 'dte');
-
-        // Classify — non-blocking, errors logged but do not fail the sync
-        await this.classifyDte(dteDoc.codigoGeneracion, rawJson).catch((err) =>
-          this.logService.log(
-            `Classification failed for ${dteDoc.codigoGeneracion}: ${err.message}`,
-            'dte',
-          ),
-        );
+      if (rawJson?.emisor?.nrc) {
+        await this.taxpayerRepository.upsert(rawJson.emisor.nrc, {
+          nit: rawJson.emisor.nit,
+          nombre: rawJson.emisor.nombre || '',
+          nombreComercial: rawJson.emisor.nombreComercial,
+          codActividad: rawJson.emisor.codActividad,
+          descActividad: rawJson.emisor.descActividad,
+          rawJson: rawJson.emisor,
+        });
       }
+      if (rawJson?.receptor?.nrc) {
+        await this.taxpayerRepository.upsert(rawJson.receptor.nrc, {
+          nit: rawJson.receptor.nit,
+          nombre: rawJson.receptor.nombre || '',
+          nombreComercial: rawJson.receptor.nombreComercial,
+          codActividad: rawJson.receptor.codActividad,
+          descActividad: rawJson.receptor.descActividad,
+          rawJson: rawJson.receptor,
+        });
+      }
+      await this.dteRepository.save(dteDoc, type, lastPdfUrl, rawJson);
+      this.logService.log(`Saved DTE to DB: ${dteDoc.codigoGeneracion}`, 'dte');
+
+      // Classify — non-blocking, errors logged but do not fail the sync
+      await this.classifyDte(dteDoc.codigoGeneracion, rawJson).catch((err) =>
+        this.logService.log(
+          `Classification failed for ${dteDoc.codigoGeneracion}: ${err.message}`,
+          'dte',
+        ),
+      );
 
       if (pdfFilenames.length > 0) {
         pdfFilenames.forEach((pdf) => {

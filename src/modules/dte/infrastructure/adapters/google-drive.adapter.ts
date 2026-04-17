@@ -90,6 +90,17 @@ export class GoogleDriveAdapter implements FileStoragePort {
         ? await this.resolveFolderPath(drive, folderPath, rootFolderId)
         : rootFolderId;
 
+      const existing = await drive.files.list({
+        q: `name='${filename}' and '${targetFolderId}' in parents and trashed=false`,
+        fields: 'files(id)',
+        spaces: 'drive',
+      });
+      if (existing.data.files?.length) {
+        const existingId = existing.data.files[0].id;
+        console.log(`File already exists in Drive, skipping upload: ${filename} (${existingId})`);
+        return existingId ?? null;
+      }
+
       const response = await drive.files.create({
         requestBody: { name: filename, parents: [targetFolderId] },
         media: { mimeType, body: Readable.from(content) },
