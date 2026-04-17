@@ -59,6 +59,7 @@ export class PrismaDteAdapter implements DteRepository {
       record.taxableTotal,
       record.amountDue,
       record.taxValue,
+      Array.isArray(record.itemsCategory) ? (record.itemsCategory as string[]) : null,
     );
   }
 

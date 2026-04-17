@@ -6,11 +6,17 @@ export interface SpendingResult {
   count: number;
 }
 
+export interface SpendingAggregation {
+  total: number;
+  count: number;
+  categories: SpendingResult[];
+}
+
 export interface AnalyticsRepository {
   getSpendingAggregation(params: {
     nrc: string;
     type: 'purchase' | 'sale';
     year: number;
     month?: number;
-  }): Promise<SpendingResult[]>;
+  }): Promise<SpendingAggregation>;
 }

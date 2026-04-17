@@ -89,16 +89,23 @@ export class FetchDteEmailsHandler
 
       const existing = await this.dteRepository.findByGenerationCode(dteDoc.codigoGeneracion);
       if (existing) {
-        this.logService.log(
-          `DTE ${dteDoc.codigoGeneracion} already exists in DB. Skipping save, classifying if needed...`,
-          'dte',
-        );
-        await this.classifyDte(dteDoc.codigoGeneracion, rawJson).catch((err) =>
+        if (existing.itemsCategory && existing.itemsCategory.length > 0) {
           this.logService.log(
-            `Classification failed for ${dteDoc.codigoGeneracion}: ${err.message}`,
+            `DTE ${dteDoc.codigoGeneracion} already exists and is classified. Skipping.`,
             'dte',
-          ),
-        );
+          );
+        } else {
+          this.logService.log(
+            `DTE ${dteDoc.codigoGeneracion} already exists but not classified. Classifying...`,
+            'dte',
+          );
+          await this.classifyDte(dteDoc.codigoGeneracion, rawJson).catch((err) =>
+            this.logService.log(
+              `Classification failed for ${dteDoc.codigoGeneracion}: ${err.message}`,
+              'dte',
+            ),
+          );
+        }
         continue;
       }
 

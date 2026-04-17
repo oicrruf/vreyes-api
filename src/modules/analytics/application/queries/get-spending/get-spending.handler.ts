@@ -1,7 +1,7 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
 import { GetSpendingQuery } from './get-spending.query';
-import { ANALYTICS_REPOSITORY, AnalyticsRepository, SpendingResult } from '../../../domain/ports/analytics-repository.port';
+import { ANALYTICS_REPOSITORY, AnalyticsRepository } from '../../../domain/ports/analytics-repository.port';
 
 @QueryHandler(GetSpendingQuery)
 export class GetSpendingHandler implements IQueryHandler<GetSpendingQuery> {
@@ -46,10 +46,14 @@ export class GetSpendingHandler implements IQueryHandler<GetSpendingQuery> {
 
     return {
       period: { year, month, type },
-      categories: currentResults,
+      total: currentResults.total,
+      count: currentResults.count,
+      categories: currentResults.categories,
       comparison: {
         period: compPeriod,
-        categories: comparisonResults,
+        total: comparisonResults.total,
+        count: comparisonResults.count,
+        categories: comparisonResults.categories,
       },
     };
   }

@@ -10,6 +10,7 @@ export class DteDocument {
     public readonly totalGravada: number,
     public readonly totalPagar: number,
     public readonly tributosValor: number,
+    public readonly itemsCategory: string[] | null = null,
   ) {}
 
   static fromJson(json: any): DteDocument | null {
