@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { LoginWithGoogleCommand } from './login-with-google.command';
 import { GOOGLE_AUTH_SERVICE, GoogleAuthService } from '../../../domain/ports/google-auth.port';
 import { USER_REPOSITORY, UserRepository } from '../../../domain/ports/user-repository.port';
+import { TAXPAYER_REPOSITORY, TaxpayerRepository } from '../../../../taxpayer/domain/ports/taxpayer-repository.port';
 import { User } from '../../../domain/entities/user.entity';
 
 @CommandHandler(LoginWithGoogleCommand)
@@ -11,6 +12,7 @@ export class LoginWithGoogleHandler implements ICommandHandler<LoginWithGoogleCo
   constructor(
     @Inject(GOOGLE_AUTH_SERVICE) private readonly googleAuth: GoogleAuthService,
     @Inject(USER_REPOSITORY) private readonly userRepository: UserRepository,
+    @Inject(TAXPAYER_REPOSITORY) private readonly taxpayerRepository: TaxpayerRepository,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -27,7 +29,7 @@ export class LoginWithGoogleHandler implements ICommandHandler<LoginWithGoogleCo
       if (!user) {
         // 3. si no existe, crear nuevo usuario
         user = await this.userRepository.save(
-          new User('', googleUser.email, googleUser.name, googleUser.picture),
+          new User('', googleUser.email, googleUser.name, googleUser.picture, undefined, undefined),
         );
       }
 
@@ -46,8 +48,26 @@ export class LoginWithGoogleHandler implements ICommandHandler<LoginWithGoogleCo
       }
     }
 
-    // 6. generar jwt de nuestra api
-    const payload = { sub: user.id, email: user.email };
+    // 6. buscar información del contribuyente si está vinculado
+    let taxpayerInfo = undefined;
+    if (user.taxpayerId) {
+      const taxpayer = await this.taxpayerRepository.findById(user.taxpayerId);
+      if (taxpayer) {
+        taxpayerInfo = {
+          nrc: taxpayer.nrc,
+          nit: taxpayer.nit,
+          nombre: taxpayer.nombre,
+        };
+      }
+    }
+
+    // 7. generar jwt de nuestra api
+    const payload = { 
+      sub: user.id, 
+      email: user.email,
+      taxpayer: taxpayerInfo,
+    };
+
     return {
       access_token: this.jwtService.sign(payload),
       user: {
@@ -55,7 +75,9 @@ export class LoginWithGoogleHandler implements ICommandHandler<LoginWithGoogleCo
         email: user.email,
         name: user.name,
         avatarUrl: user.avatarUrl,
+        taxpayer: taxpayerInfo,
       },
     };
   }
 }
+

@@ -7,6 +7,7 @@ export class PrismaTaxpayerAdapter implements TaxpayerRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async upsert(nrc: string, data: TaxpayerData): Promise<void> {
+    const cleanNrc = this.sanitizeNrc(nrc);
     await this.prisma.$transaction(async (tx) => {
       if (data.codActividad && data.descActividad) {
         await tx.activity.upsert({
@@ -22,9 +23,9 @@ export class PrismaTaxpayerAdapter implements TaxpayerRepository {
       }
 
       await tx.taxpayer.upsert({
-        where: { nrc },
+        where: { nrc: cleanNrc },
         create: {
-          nrc,
+          nrc: cleanNrc,
           nit: data.nit ?? null,
           nombre: data.nombre,
           nombreComercial: data.nombreComercial ?? null,
@@ -41,4 +42,41 @@ export class PrismaTaxpayerAdapter implements TaxpayerRepository {
       });
     });
   }
+
+  async findById(id: string): Promise<any | null> {
+    const record = await (this.prisma as any).taxpayer.findUnique({
+      where: { id },
+      include: { activity: true },
+    });
+    if (!record) return null;
+    return this.mapToDomain(record);
+  }
+
+  async findByNrc(nrc: string): Promise<any | null> {
+    const record = await (this.prisma as any).taxpayer.findUnique({
+      where: { nrc: this.sanitizeNrc(nrc) },
+      include: { activity: true },
+    });
+    if (!record) return null;
+    return this.mapToDomain(record);
+  }
+
+  private sanitizeNrc(nrc: string): string {
+    return nrc.replace(/-/g, '');
+  }
+
+
+  private mapToDomain(record: any): any {
+    return {
+      id: record.id,
+      nrc: record.nrc,
+      nit: record.nit,
+      nombre: record.nombre,
+      nombreComercial: record.nombreComercial,
+      codActividad: record.codActividad,
+      descActividad: record.activity?.descActividad,
+      rawJson: record.rawJson as any,
+    };
+  }
 }
+

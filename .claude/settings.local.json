@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(claude plugin *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(npx prisma *)",
+      "Bash(git -C /Users/vreyes/Source/vreyes-api log --oneline -5)",
+      "Bash(git reset *)",
+      "Bash(npx tsc *)",
+      "Bash(git stash *)",
+      "Bash(node -e ' *)",
+      "Bash(python3 -c \"import os; print\\(os.path.relpath\\('/Users/vreyes/Source/vreyes-api/src/shared/database/prisma.service.ts', '/Users/vreyes/Source/vreyes-api/src/modules/taxpayer/infrastructure/adapters'\\)\\)\")",
+      "Bash(PRISMA_FORCE_COLOR=0 npx --yes prisma migrate dev --name add-user-taxpayer-relation)"
+    ]
+  }
+}

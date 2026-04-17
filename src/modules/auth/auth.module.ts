@@ -7,8 +7,11 @@ import { PrismaUserAdapter } from './infrastructure/adapters/prisma-user.adapter
 import { GoogleAuthAdapter } from './infrastructure/adapters/google-auth.adapter';
 import { JwtStrategy } from './infrastructure/strategies/jwt.strategy';
 import { LoginWithGoogleHandler } from './application/commands/login-with-google/login-with-google.handler';
+import { LinkUserTaxpayerHandler } from './application/commands/link-user-taxpayer/link-user-taxpayer.handler';
 import { AuthController } from './infrastructure/http/auth.controller';
+import { UsersController } from './infrastructure/http/users.controller';
 import { CqrsModule } from '@nestjs/cqrs';
+import { TaxpayerModule } from '../taxpayer/taxpayer.module';
 
 @Module({
   imports: [
@@ -18,8 +21,9 @@ import { CqrsModule } from '@nestjs/cqrs';
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '7d' },
     }),
+    TaxpayerModule,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, UsersController],
   providers: [
     {
       provide: USER_REPOSITORY,
@@ -31,6 +35,7 @@ import { CqrsModule } from '@nestjs/cqrs';
     },
     JwtStrategy,
     LoginWithGoogleHandler,
+    LinkUserTaxpayerHandler,
   ],
   exports: [USER_REPOSITORY, PassportModule, JwtStrategy],
 })

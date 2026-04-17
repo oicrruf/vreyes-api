@@ -12,7 +12,7 @@ export class PrismaUserAdapter implements UserRepository {
   async findByEmail(email: string): Promise<User | null> {
     const record = await (this.prisma as any).user.findUnique({
       where: { email },
-      include: { identities: true },
+      include: { identities: true, taxpayer: true },
     });
 
     if (!record) return null;
@@ -28,7 +28,7 @@ export class PrismaUserAdapter implements UserRepository {
           providerId,
         },
       },
-      include: { user: { include: { identities: true } } },
+      include: { user: { include: { identities: true, taxpayer: true } } },
     });
 
     if (!identityRecord) return null;
@@ -48,7 +48,7 @@ export class PrismaUserAdapter implements UserRepository {
         name: user.name,
         avatarUrl: user.avatarUrl,
       },
-      include: { identities: true },
+      include: { identities: true, taxpayer: true },
     });
 
     return this.mapToDomain(record);
@@ -73,12 +73,28 @@ export class PrismaUserAdapter implements UserRepository {
     });
   }
 
+  async updateTaxpayerId(userId: string, taxpayerId: string): Promise<User> {
+    const record = await (this.prisma as any).user.update({
+      where: { id: userId },
+      data: { taxpayerId },
+      include: { identities: true, taxpayer: true },
+    });
+
+    return this.mapToDomain(record);
+  }
+
   private mapToDomain(record: any): User {
     return new User(
       record.id,
       record.email,
       record.name,
       record.avatarUrl,
+      record.taxpayerId,
+      record.taxpayer ? { 
+        nrc: record.taxpayer.nrc, 
+        nit: record.taxpayer.nit, 
+        nombre: record.taxpayer.nombre 
+      } : undefined,
       record.identities.map(
         (i: any) =>
           new UserIdentity(

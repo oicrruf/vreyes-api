@@ -34,6 +34,7 @@ model Taxpayer {
   activity     Activity? @relation(fields: [codActividad], references: [codActividad])
   issuedDtes   Dte[]     @relation("issuer")
   receivedDtes Dte[]     @relation("receiver")
+  user         User?
 
   @@map("taxpayer")
 }
@@ -60,16 +61,19 @@ model Dte {
 }
 
 model User {
-  id         String         @id @default(uuid())
-  email      String         @unique
-  name       String?
-  avatarUrl  String?        @map("avatar_url")
-  createdAt  DateTime       @default(now()) @map("created_at")
-  updatedAt  DateTime       @updatedAt @map("updated_at")
-  identities UserIdentity[]
+  id          String         @id @default(uuid())
+  email       String         @unique
+  name        String?
+  avatarUrl   String?        @map("avatar_url")
+  taxpayerId  String?        @unique @map("taxpayer_id")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+  identities  UserIdentity[]
+  taxpayer    Taxpayer?      @relation(fields: [taxpayerId], references: [id])
 
   @@map("users")
 }
+
 
 enum IdentityProvider {
   google

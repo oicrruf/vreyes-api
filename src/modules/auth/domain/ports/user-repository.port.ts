@@ -9,4 +9,6 @@ export interface UserRepository {
   save(user: User): Promise<User>;
   addIdentity(userId: string, identity: Partial<UserIdentity>): Promise<void>;
   updateLastLogin(identityId: string): Promise<void>;
+  updateTaxpayerId(userId: string, taxpayerId: string): Promise<User>;
 }
+

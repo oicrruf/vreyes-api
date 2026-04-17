@@ -17,4 +17,7 @@ export interface TaxpayerRepository {
    * the catalog lookup is always NRC-keyed. Null-NRC rows are not supported at sync time.
    */
   upsert(nrc: string, data: TaxpayerData): Promise<void>;
+  findById(id: string): Promise<(TaxpayerData & { id: string; nrc: string | null }) | null>;
+  findByNrc(nrc: string): Promise<(TaxpayerData & { id: string; nrc: string | null }) | null>;
 }
+
