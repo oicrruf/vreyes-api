@@ -12,9 +12,12 @@ import {
   NotFoundException,
   InternalServerErrorException,
   HttpException,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../../shared/guards/jwt-auth.guard';
 import { FetchDteEmailsCommand } from '../../application/commands/fetch-dte-emails/fetch-dte-emails.command';
 import { SendDteAttachmentsCommand } from '../../application/commands/send-dte-attachments/send-dte-attachments.command';
@@ -22,6 +25,8 @@ import { GetDteFilesQuery } from '../../application/queries/get-dte-files/get-dt
 import { GetDteDetailQuery } from '../../application/queries/get-dte-detail/get-dte-detail.query';
 import { FetchDteDto } from './dto/fetch-dte.dto';
 import { SendDteAttachmentsDto } from './dto/send-dte-attachments.dto';
+import { UploadSaleDteCommand } from '../../application/commands/upload-sale-dte/upload-sale-dte.command';
+import { UploadSaleDteDto } from './dto/upload-sale-dte.dto';
 
 @ApiTags('DTE')
 @ApiBearerAuth()
@@ -113,6 +118,46 @@ export class DteController {
   @ApiResponse({ status: 404, description: 'DTE no encontrado.' })
   async getDteDetail(@Param('generationCode') generationCode: string) {
     return this.queryBus.execute(new GetDteDetailQuery(generationCode));
+  }
+
+  @Post('dte/upload')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sube manualmente una venta (DTE). JSON requerido, PDF opcional.' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: UploadSaleDteDto })
+  @ApiResponse({ status: 200, description: 'DTE procesado y guardado.' })
+  @ApiResponse({ status: 400, description: 'JSON inválido o campos DTE faltantes.' })
+  @ApiResponse({ status: 409, description: 'El DTE ya existe.' })
+  @ApiResponse({ status: 500, description: 'Error interno.' })
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'json', maxCount: 1 },
+      { name: 'pdf', maxCount: 1 },
+    ]),
+  )
+  async uploadSaleDte(
+    @UploadedFiles()
+    files: {
+      json?: Express.Multer.File[];
+      pdf?: Express.Multer.File[];
+    },
+  ) {
+    if (!files?.json?.[0]) {
+      throw new BadRequestException('El archivo JSON es requerido.');
+    }
+
+    try {
+      const result = await this.commandBus.execute(
+        new UploadSaleDteCommand(
+          files.json[0].buffer,
+          files.pdf?.[0]?.buffer,
+        ),
+      );
+      return { success: true, ...result };
+    } catch (err: any) {
+      if (err instanceof HttpException) throw err;
+      throw new InternalServerErrorException('Error al procesar el DTE.');
+    }
   }
 
   @Post('attachments/dte/email')
