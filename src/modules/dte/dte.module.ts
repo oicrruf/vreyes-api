@@ -18,6 +18,7 @@ import { FetchDteEmailsHandler } from './application/commands/fetch-dte-emails/f
 import { SendDteAttachmentsHandler } from './application/commands/send-dte-attachments/send-dte-attachments.handler';
 import { GetDteFilesHandler } from './application/queries/get-dte-files/get-dte-files.handler';
 import { GetDteDetailHandler } from './application/queries/get-dte-detail/get-dte-detail.handler';
+import { UploadSaleDteHandler } from './application/commands/upload-sale-dte/upload-sale-dte.handler';
 
 import { DteController } from './infrastructure/http/dte.controller';
 import { DteScheduler } from './infrastructure/scheduled/dte.scheduler';
@@ -38,6 +39,7 @@ import { LogService } from '../../shared/logging/log.service';
     SendDteAttachmentsHandler,
     GetDteFilesHandler,
     GetDteDetailHandler,
+    UploadSaleDteHandler,
 
     // Scheduler
     DteScheduler,
