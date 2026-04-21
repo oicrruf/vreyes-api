@@ -25,6 +25,7 @@ export interface DteRecord {
 export interface DteRepository {
   save(dte: DteDocument, type: DteType, pdfUrl?: string, rawJson?: object): Promise<void>;
   findByGenerationCode(code: string): Promise<DteDocument | null>;
+  findByNumeroControl(numeroControl: string): Promise<DteDocument | null>;
   findAll(type?: DteType): Promise<DteDocument[]>;
   findByPeriod(year: number, month: number, type: DteType): Promise<DteRecord[]>;
   findRawJson(generationCode: string): Promise<object | null>;

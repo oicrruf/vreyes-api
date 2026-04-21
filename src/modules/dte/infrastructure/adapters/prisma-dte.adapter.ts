@@ -63,6 +63,10 @@ export class PrismaDteAdapter implements DteRepository {
     );
   }
 
+  async findByNumeroControl(numeroControl: string): Promise<DteDocument | null> {
+    return this.findByGenerationCode(numeroControl);
+  }
+
   async findAll(type?: DteType): Promise<DteDocument[]> {
     const records = await this.prisma.dte.findMany({
       where: type ? { type: this.toPrismaType(type) } : undefined,

@@ -27,6 +27,7 @@ import { FetchDteDto } from './dto/fetch-dte.dto';
 import { SendDteAttachmentsDto } from './dto/send-dte-attachments.dto';
 import { UploadSaleDteCommand } from '../../application/commands/upload-sale-dte/upload-sale-dte.command';
 import { UploadSaleDteDto } from './dto/upload-sale-dte.dto';
+import { ExtractDteFromFilesCommand } from '../../application/commands/extract-dte-from-files/extract-dte-from-files.command';
 
 @ApiTags('DTE')
 @ApiBearerAuth()
@@ -122,17 +123,20 @@ export class DteController {
 
   @Post('dte/upload')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Sube manualmente una venta (DTE). JSON requerido, PDF opcional.' })
+  @ApiOperation({
+    summary: 'Sube un DTE manualmente (JSON requerido, PDF opcional) O extrae datos de PDFs con IA (sin JSON, hasta 12 PDFs).',
+  })
   @ApiConsumes('multipart/form-data')
   @ApiBody({ type: UploadSaleDteDto })
-  @ApiResponse({ status: 200, description: 'DTE procesado y guardado.' })
-  @ApiResponse({ status: 400, description: 'JSON inválido o campos DTE faltantes.' })
-  @ApiResponse({ status: 409, description: 'El DTE ya existe.' })
+  @ApiResponse({ status: 200, description: 'DTE(s) procesado(s) y guardado(s).' })
+  @ApiResponse({ status: 400, description: 'Parámetros inválidos.' })
+  @ApiResponse({ status: 409, description: 'Uno o más DTEs ya existen.' })
+  @ApiResponse({ status: 422, description: 'No se pudo extraer CCF válido de uno o más PDFs.' })
   @ApiResponse({ status: 500, description: 'Error interno.' })
   @UseInterceptors(
     FileFieldsInterceptor([
       { name: 'json', maxCount: 1 },
-      { name: 'pdf', maxCount: 1 },
+      { name: 'pdf', maxCount: 12 },
     ]),
   )
   async uploadSaleDte(
@@ -142,21 +146,59 @@ export class DteController {
       pdf?: Express.Multer.File[];
     },
   ) {
-    if (!files?.json?.[0]) {
-      throw new BadRequestException('El archivo JSON es requerido.');
+    const jsonFile = files?.json?.[0];
+    const pdfFiles = files?.pdf ?? [];
+
+    // Caso: ningún archivo
+    if (!jsonFile && pdfFiles.length === 0) {
+      throw new BadRequestException('Se requiere al menos un archivo JSON o PDF.');
+    }
+
+    // Caso A: JSON presente → flujo manual
+    if (jsonFile) {
+      // Validar nombre coincidente si también viene PDF
+      if (pdfFiles.length > 0) {
+        const jsonName = jsonFile.originalname.replace(/\.[^.]+$/, '');
+        const pdfName = pdfFiles[0].originalname.replace(/\.[^.]+$/, '');
+        if (jsonName !== pdfName) {
+          throw new BadRequestException(
+            `El nombre del PDF ("${pdfFiles[0].originalname}") no coincide con el del JSON ("${jsonFile.originalname}").`,
+          );
+        }
+      }
+
+      try {
+        const result = await this.commandBus.execute(
+          new UploadSaleDteCommand(
+            jsonFile.buffer,
+            pdfFiles[0]?.buffer,
+          ),
+        );
+        return { success: true, ...result };
+      } catch (err: any) {
+        if (err instanceof HttpException) throw err;
+        throw new InternalServerErrorException('Error al procesar el DTE.');
+      }
+    }
+
+    // Caso B: Solo PDFs → extracción automática con Groq Vision
+    // Validar que todos sean PDF
+    for (const file of pdfFiles) {
+      if (file.mimetype !== 'application/pdf') {
+        throw new BadRequestException(
+          `Solo se permiten archivos PDF. "${file.originalname}" tiene tipo "${file.mimetype}".`,
+        );
+      }
     }
 
     try {
-      const result = await this.commandBus.execute(
-        new UploadSaleDteCommand(
-          files.json[0].buffer,
-          files.pdf?.[0]?.buffer,
-        ),
+      const results = await this.commandBus.execute(
+        new ExtractDteFromFilesCommand(pdfFiles.map((f) => f.buffer)),
       );
-      return { success: true, ...result };
+      return { success: true, results };
     } catch (err: any) {
       if (err instanceof HttpException) throw err;
-      throw new InternalServerErrorException('Error al procesar el DTE.');
+      throw new InternalServerErrorException('Error al extraer y procesar los DTEs.');
     }
   }
 

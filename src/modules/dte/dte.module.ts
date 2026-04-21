@@ -19,10 +19,12 @@ import { SendDteAttachmentsHandler } from './application/commands/send-dte-attac
 import { GetDteFilesHandler } from './application/queries/get-dte-files/get-dte-files.handler';
 import { GetDteDetailHandler } from './application/queries/get-dte-detail/get-dte-detail.handler';
 import { UploadSaleDteHandler } from './application/commands/upload-sale-dte/upload-sale-dte.handler';
+import { ExtractDteFromFilesHandler } from './application/commands/extract-dte-from-files/extract-dte-from-files.handler';
 
 import { DteController } from './infrastructure/http/dte.controller';
 import { DteScheduler } from './infrastructure/scheduled/dte.scheduler';
 import { LogService } from '../../shared/logging/log.service';
+import { PdfToImageService } from '../../shared/pdf/pdf-to-image.service';
 
 @Module({
   imports: [CqrsModule, AuthModule, LlmModule, TaxpayerModule],
@@ -40,12 +42,14 @@ import { LogService } from '../../shared/logging/log.service';
     GetDteFilesHandler,
     GetDteDetailHandler,
     UploadSaleDteHandler,
+    ExtractDteFromFilesHandler,
 
     // Scheduler
     DteScheduler,
 
     // Shared
     LogService,
+    PdfToImageService,
   ],
 })
 export class DteModule {}

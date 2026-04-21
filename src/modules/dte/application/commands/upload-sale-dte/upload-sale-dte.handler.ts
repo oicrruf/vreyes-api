@@ -56,7 +56,7 @@ export class UploadSaleDteHandler
     const driveFolderPath = `dte/${year}/${month}/ventas`;
 
     // 5. Upload JSON to Drive (non-blocking)
-    const jsonFilename = `${dteDoc.codigoGeneracion}.json`;
+    const jsonFilename = `${dteDoc.fileId}.json`;
     const jsonDriveId = await this.fileStorage
       .upload(jsonFilename, command.jsonBuffer, 'application/json', driveFolderPath)
       .catch((err) => {
@@ -70,7 +70,7 @@ export class UploadSaleDteHandler
     // 6. Upload PDF to Drive (non-blocking, optional)
     let pdfUrl: string | undefined;
     if (command.pdfBuffer) {
-      const pdfFilename = `${dteDoc.codigoGeneracion}.pdf`;
+      const pdfFilename = `${dteDoc.fileId}.pdf`;
       const pdfDriveId = await this.fileStorage
         .upload(pdfFilename, command.pdfBuffer, 'application/pdf', driveFolderPath)
         .catch((err) => {
